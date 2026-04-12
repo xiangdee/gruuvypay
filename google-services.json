@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "604194047753",
+    "project_id": "gruuvypay",
+    "storage_bucket": "gruuvypay.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:604194047753:android:d5071beb1dcec7e94b75d8",
+        "android_client_info": {
+          "package_name": "com.kemeasoude.gruuvypay"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5_wR3fIs64apd1WXxJXX05Vlt8PZQmgE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
