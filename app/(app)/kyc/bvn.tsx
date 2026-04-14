@@ -135,6 +135,7 @@ export default function BvnScreen() {
             label={dob ? dobDisplay(dob) : 'Select date of birth'}
             variant="secondary"
             onPress={() => setShowPicker(true)}
+          
             icon={<Ionicons name="calendar-outline" size={18} color={theme.text.secondary} />}
           />
           {showPicker && (
