@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { Screen } from '@/components/layout/Screen';
 import { PinInput } from '@/components/ui/PinInput';
 import { useTheme, textStyles, spacing } from '@/theme';
-import { useSetPinLogic } from './set-pin.logic';
+import { useSetPinLogic } from '../../src/screens/auth/set-pin.logic';
 
 export default function SetPinScreen() {
   const { theme } = useTheme();

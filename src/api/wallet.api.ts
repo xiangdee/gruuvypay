@@ -20,16 +20,29 @@ export const walletApi = {
     return data;
   },
 
-  lookupTag: async (tag: string) => {
-    const { data } = await apiClient.get('/wallet/lookup', { params: { tag } });
-    return data;
+
+  lookupTag: async (tag: string): Promise<{ username: string; name: string } | null> => {
+    try {
+      const { data } = await apiClient.get(`/wallet/lookup/${tag}`);
+      return data;
+    } catch {
+      return null;
+    }
   },
 
   sendToTag: async (payload: {
-    tag: string; amountNaira: string;
-    narration?: string; pin: string;
-  }) => {
-    const { data } = await apiClient.post('/wallet/send', payload);
+    tag:            string;
+    amountNaira:    string;
+    narration?:      string;
+    pin:            string;
+    idempotencyKey: string;  // caller generates once, reuses on retry
+  }): Promise<{
+    amountNaira: string; reference: string; newBalance: string 
+}> => {
+    const { idempotencyKey, ...body } = payload;
+    const { data } = await apiClient.post('/wallet/send', body, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
     return data;
   },
 };

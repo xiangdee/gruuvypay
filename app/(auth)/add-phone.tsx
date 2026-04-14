@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ErrorCard } from '@/components/ui/ErrorCard';
 import { useTheme, textStyles, spacing } from '@/theme';
-import { useAddPhoneLogic } from './add-phone.logic';
+import { useAddPhoneLogic } from '../../src/screens/auth/add-phone.logic';
 
 export default function AddPhoneScreen() {
   const { theme } = useTheme();

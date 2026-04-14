@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/layout/Screen';
 import { Button } from '@/components/ui/Button';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { useBiometricsLogic } from './biometrics.logic';
+import { useBiometricsLogic } from '../../src/screens/auth/biometrics.logic';
 
 export default function BiometricsScreen() {
   const { theme } = useTheme();

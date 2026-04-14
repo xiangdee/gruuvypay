@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/layout/Screen';
 import { Button } from '@/components/ui/Button';
 import { useTheme, textStyles, spacing, radius, palette } from '@/theme';
-import { useNotificationsLogic } from './notifications.logic';
+import { useNotificationsLogic } from '../../src/screens/auth/notifications.logic';
 
 export default function NotificationsScreen() {
   const { theme } = useTheme();

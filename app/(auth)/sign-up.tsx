@@ -9,7 +9,7 @@ import { KeyboardView } from '@/components/layout/KeyboardView';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { useSignUpLogic } from './sign-up.logic';
+import { useSignUpLogic } from '../../src/screens/auth/sign-up.logic';
 
 export default function SignUpScreen() {
   const { theme } = useTheme();

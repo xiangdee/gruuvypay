@@ -17,34 +17,40 @@ interface Transaction {
   narration: string | null;
   createdAt: string;
   metadata:  any;
+  amountNaira: string
 }
 
 interface WalletState {
-  balance:        string | null;   // formatted "₦0.00"
-  balanceRaw:     string | null;   // kobo string — for calculations
-  currency:       string;
-  balanceVisible: boolean;         // hide/show balance toggle
-  virtualAccount: VirtualAccount | null;
-  transactions:   Transaction[];
-  txPage:         number;
-  txTotal:        number;
-  txLoading:      boolean;
-  loading:        boolean;
-  error:          string | null;
+  balance:         string | null;  // formatted "₦5,000.00"
+  balanceRaw:      string | null;  // raw kobo string — used for math/validation
+  currency:        string;
+  balanceVisible:  boolean;
+  virtualAccount:  VirtualAccount | null;
+  vaLoading:       boolean;        // separate loading for VA fetch
+  transactions:    Transaction[];
+  txPage:          number;
+  txTotal:         number;
+  txLoading:       boolean;
+  loading:         boolean;
+  dailySpentNaira: number;         // total NGN sent today — for tier limit display
+  error:           string | null;
+
 }
 
 const initialState: WalletState = {
-  balance:        null,
-  balanceRaw:     null,
-  currency:       'NGN',
-  balanceVisible: true,
-  virtualAccount: null,
-  transactions:   [],
-  txPage:         1,
-  txTotal:        0,
-  txLoading:      false,
-  loading:        false,
-  error:          null,
+  balance:         null,
+  balanceRaw:      null,
+  currency:        'NGN',
+  balanceVisible:  true,
+  virtualAccount:  null,
+  vaLoading:       false,
+  transactions:    [],
+  txPage:          1,
+  txTotal:         0,
+  txLoading:       false,
+  loading:         false,
+  dailySpentNaira: 0,
+  error:           null,
 };
 
 // ─── Thunks ───────────────────────────────────────────────────────────
@@ -85,13 +91,19 @@ export const fetchTransactions = createAsyncThunk(
 export const sendToTag = createAsyncThunk(
   'wallet/sendToTag',
   async (
-    payload: { tag: string; amountNaira: string; narration?: string; pin: string },
+    payload: {
+      tag:            string;
+      amountNaira:    string;
+      narration?:     string;
+      pin:            string;
+      idempotencyKey: string;
+    },
     { rejectWithValue },
   ) => {
     try {
       return await walletApi.sendToTag(payload);
     } catch (err: any) {
-      return rejectWithValue(err.message);
+      return rejectWithValue(err?.response?.data?.message ?? err.message);
     }
   },
 );
@@ -108,10 +120,14 @@ const walletSlice = createSlice({
     clearWalletError(state) {
       state.error = null;
     },
-    // Called by webhook push notification handler to optimistically update balance
+    // Called by webhook push notification to optimistically update balance
     applyCredit(state, action: PayloadAction<{ amountFormatted: string; amountRaw: string }>) {
-      state.balance = action.payload.amountFormatted;
+      state.balance    = action.payload.amountFormatted;
       state.balanceRaw = action.payload.amountRaw;
+    },
+    // Reset daily spend counter — call this at midnight or on day change
+    resetDailySpend(state) {
+      state.dailySpentNaira = 0;
     },
   },
   extraReducers: (builder) => {
@@ -129,8 +145,15 @@ const walletSlice = createSlice({
       });
 
     builder
+      .addCase(fetchVirtualAccount.pending, (state) => {
+        state.vaLoading = true;
+      })
       .addCase(fetchVirtualAccount.fulfilled, (state, action) => {
+        state.vaLoading    = false;
         state.virtualAccount = action.payload;
+      })
+      .addCase(fetchVirtualAccount.rejected, (state) => {
+        state.vaLoading = false;
       });
 
     builder
@@ -151,11 +174,13 @@ const walletSlice = createSlice({
 
     builder
       .addCase(sendToTag.fulfilled, (state, action) => {
-        // Update balance after transfer
-        state.balance = action.payload.newBalance;
+        state.balance    = action.payload.newBalance;
+        // Track daily spend for tier limit display (not authoritative — backend enforces)
+        const sent = parseFloat(action.payload.amountNaira ?? '0');
+        if (!isNaN(sent)) state.dailySpentNaira += sent;
       });
   },
 });
 
-export const { toggleBalanceVisibility, clearWalletError, applyCredit } = walletSlice.actions;
+export const { toggleBalanceVisibility, clearWalletError, applyCredit, resetDailySpend } = walletSlice.actions;
 export default walletSlice.reducer;

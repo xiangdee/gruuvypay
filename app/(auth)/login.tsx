@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PinInput } from '@/components/ui/PinInput';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { useLoginLogic } from './login.logic';
+import { useLoginLogic } from '../../src/screens/auth/login.logic';
 
 export default function LoginScreen() {
   const { theme } = useTheme();

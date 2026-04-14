@@ -1,3 +1,6 @@
+import { TwoFaType } from '@/types/two-fa.types';
+// app/(auth)/login.logic.ts
+
 import { useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -15,21 +18,35 @@ export function useLoginLogic() {
   const toast     = useToast();
   const loading   = useAppSelector((s) => s.auth.loading);
 
-  const [step,       setStep]       = useState<LoginStep>('identifier');
-  const [identifier, setIdentifier] = useState('');
+  const [step,            setStep]           = useState<LoginStep>('identifier');
+  const [identifier,      setIdentifier]      = useState('');
+  const [identifierError, setIdentifierError] = useState('');
+
+  function handleIdentifierChange(val: string) {
+    setIdentifier(val);
+    if (identifierError) setIdentifierError('');
+  }
   const [pinError,   setPinError]   = useState(false);
   const pinRef = useRef<{ shake: () => void; reset: () => void } | null>(null);
 
-  function validateIdentifier(): boolean {
-    if (!identifier.trim()) {
-      toast.error('Required', 'Enter your username or email');
-      return false;
-    }
-    return true;
+  function validateIdentifier(): string | null {
+    const val = identifier.trim();
+    if (!val) return 'Please enter your username or email';
+    // Email pattern
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    // Username pattern (3-20 chars, letters/numbers/underscore)
+    const isUsername = /^[a-zA-Z0-9_]{3,20}$/.test(val.replace('@', ''));
+    if (!isEmail && !isUsername) return 'Enter a valid username or email address';
+    return null;
   }
 
   function goToPin() {
-    if (!validateIdentifier()) return;
+    const error = validateIdentifier();
+    if (error) {
+      setIdentifierError(error);
+      return;
+    }
+    setIdentifierError('');
     setStep('pin');
   }
 
@@ -51,7 +68,7 @@ export function useLoginLogic() {
           params: {
             userId:    payload.userId ?? '',
             token:     payload.token,
-            twoFaType: payload.twoFaType,
+            twoFaType: payload.twoFaType as TwoFaType,
           },
         });
         return;
@@ -88,7 +105,9 @@ export function useLoginLogic() {
   }
 
   return {
-    step, identifier, setIdentifier,
+    step, identifier,
+    setIdentifier: handleIdentifierChange,
+    identifierError,
     loading, pinError, pinRef,
     goToPin, goBack, goToSignUp,
     onPinComplete, tryBiometricLogin,

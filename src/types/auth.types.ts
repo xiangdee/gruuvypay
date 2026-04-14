@@ -1,9 +1,12 @@
+import { TwoFaType } from './two-fa.types';
+// src/types/auth.types.ts
+
 export type OnboardingStep = 'PHONE' | 'PIN' | 'BIOMETRICS' | 'COMPLETE';
 export type Tier = 'TIER_0' | 'TIER_1' | 'TIER_2' | 'TIER_3';
 
 export interface AuthUser {
   id:                string;
-  username:          string;   // "@xiangdee"
+  username:          string;   
   email:             string;
   firstName:         string;
   lastName:          string;
@@ -11,6 +14,9 @@ export interface AuthUser {
   onboardingStep:    OnboardingStep;
   isPhoneVerified:   boolean;
   isBiometricEnabled: boolean;
+  twoFaType?: TwoFaType | null;
+  isTwofaActive?: boolean;
+  phone:string;
 }
 
 export interface AuthResponse {
@@ -25,7 +31,7 @@ export interface AuthResponse {
 export interface TwoFaResponse {
   type:      'twoFa';
   message:   string;
-  twoFaType: string;
+  twoFaType: TwoFaType;
   token:     string;
 }
 

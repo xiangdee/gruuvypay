@@ -15,6 +15,7 @@ interface AuthState {
   onboardingStep:   OnboardingStep | null;
   loading:          boolean;
   error:            string | null;
+  
 }
 
 const initialState: AuthState = {

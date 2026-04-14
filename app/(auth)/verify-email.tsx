@@ -7,7 +7,7 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { Button } from '@/components/ui/Button';
 import { ResendOtpButton } from '@/components/ui/ResendOtpButton';
 import { useTheme, textStyles, spacing } from '@/theme';
-import { useVerifyEmailLogic } from './verify-email.logic';
+import { useVerifyEmailLogic } from '../../src/screens/auth/verify-email.logic';
 
 export default function VerifyEmailScreen() {
   const { theme } = useTheme();

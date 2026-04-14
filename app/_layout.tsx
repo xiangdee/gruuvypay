@@ -1,43 +1,96 @@
-// app/_layout.tsx
-// Root layout — providers only, no logic here
-// Logic lives in _layout.logic.ts
+// app/(app)/_layout.tsx
+// 4 tabs: Home, Crypto, Cards, Profile
+// Transactions live inside Home — no wasted tab
 
 import React from 'react';
-import { View } from 'react-native';
-import { Stack } from 'expo-router';
-import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { store, persistor } from '@/store';
-import { ThemeProvider, useTheme } from '@/theme';
-import { ToastRenderer } from '@/components/ui/Toast';
-import { useRootLayout } from './_layout.logic';
+import { Tabs } from 'expo-router';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme, spacing, layout } from '@/theme';
 
-// Inner component — needs to be inside Provider to access Redux
-function RootLayoutInner() {
-  const { theme } = useTheme();
-  const { fontsLoaded, appReady } = useRootLayout();
+type TabIconProps = {
+  name: keyof typeof Ionicons.glyphMap;
+  focused: boolean;
+  label: string;
+  color: string;
+};
 
-  if (!fontsLoaded || !appReady) return null;
-
+function TabIcon({ name, focused, label, color }: TabIconProps) {
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg.primary }}>
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />
-      <ToastRenderer />
+    <View style={styles.tabItem}>
+      <Ionicons
+        name={focused ? name : `${name}-outline` as any}
+        size={22}
+        color={color}
+      />
+      <Text style={[styles.tabLabel, { color, fontWeight: focused ? '600' : '400' }]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-export default function RootLayout() {
+export default function AppLayout() {
+  const { theme } = useTheme();
+  const insets    = useSafeAreaInsets();
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Provider store={store}>
-        <PersistGate loading={null} persistor={persistor}>
-          <ThemeProvider>
-            <RootLayoutInner />
-          </ThemeProvider>
-        </PersistGate>
-      </Provider>
-    </GestureHandlerRootView>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor:  theme.tabBar.bg,
+          borderTopColor:   theme.border.DEFAULT,
+          borderTopWidth:   0.5,
+          height:           layout.tabBarHeight + insets.bottom,
+          paddingBottom:    insets.bottom,
+          paddingTop:       spacing[2],
+        },
+        tabBarActiveTintColor:   theme.tabBar.active,
+        tabBarInactiveTintColor: theme.tabBar.inactive,
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="home" focused={focused} label="Home" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="crypto"
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="logo-bitcoin" focused={focused} label="Crypto" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cards"
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="card" focused={focused} label="Cards" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile/index"
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="person" focused={focused} label="Profile" color={color} />
+          ),
+        }}
+      />
+      {/* transactions.tsx exists as a route but hidden from tab bar */}
+      <Tabs.Screen name="transactions" options={{ href: null }} />
+    </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabItem:  { alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tabLabel: { letterSpacing: 0.2, fontSize: 10 },
+});

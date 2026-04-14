@@ -1,3 +1,4 @@
+import { TwoFaType } from '@/types/two-fa.types';
 // src/api/auth.api.ts
 
 import apiClient from './client';
@@ -21,7 +22,7 @@ export const authApi = {
 
   completeTwoFa: async (payload: {
     userId: string; token: string; code: string;
-    twoFaType: string; deviceName: string;
+    twoFaType: TwoFaType; deviceName: string;
   }): Promise<AuthResponse> => {
     const { data } = await apiClient.post('/auth/login/2fa', payload);
     return data;
@@ -81,7 +82,31 @@ export const authApi = {
     const { data } = await apiClient.post('/auth/email/verify', { token });
     return data;
   },
+
   resendVerificationEmail: async (email: string): Promise<void> => {
     await apiClient.post('/auth/email/resend', { email });
+  },
+
+  // ── Forgot PIN ─────────────────────────────────────────────────────
+  // Step 1: send OTP to phone (server verifies phone exists on an account)
+  sendForgotPinOtp: async (phone: string): Promise<{ message: string; pinId: string }> => {
+    const { data } = await apiClient.post('/auth/pin/forgot/send-otp', { phone });
+    return data;
+  },
+
+  // Step 2: verify OTP — server issues a short-lived reset token
+  verifyForgotPinOtp: async (payload: {
+    phone: string; otp: string; pinId: string;
+  }): Promise<{ resetToken: string }> => {
+    const { data } = await apiClient.post('/auth/pin/forgot/verify-otp', payload);
+    return data;
+  },
+
+  // Step 3: set new PIN using the reset token
+  resetPin: async (payload: {
+    phone: string; pin: string; confirmPin: string;
+  }): Promise<{ message: string }> => {
+    const { data } = await apiClient.post('/auth/pin/reset', payload);
+    return data;
   },
 };

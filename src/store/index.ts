@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './slices/auth.slice';
 import uiReducer from './slices/ui.slice';
 import walletReducer from './slices/wallet.slice';
+import currencyReducer from './slices/currency.slice';
 
 // ─── Persist configs ──────────────────────────────────────────────────
 // IMPORTANT: Never persist the access token — always re-derive from
@@ -19,7 +20,7 @@ import walletReducer from './slices/wallet.slice';
 const authPersistConfig = {
   key: 'auth',
   storage: AsyncStorage,
-  whitelist: ['user', 'isAuthenticated', 'onboardingStep'],
+  whitelist: ['user', 'isAuthenticated', 'onboardingStep','currency'],
   // accessToken intentionally excluded — lives in memory only
 };
 
@@ -29,6 +30,7 @@ const uiPersistConfig = {
   whitelist: ['colorScheme'], // persist theme preference
 };
 
+
 // Wallet is NOT persisted — always fresh from API
 // Balance shown from cache only during loading state
 
@@ -36,6 +38,7 @@ const rootReducer = combineReducers({
   auth:   persistReducer(authPersistConfig, authReducer),
   ui:     persistReducer(uiPersistConfig, uiReducer),
   wallet: walletReducer,  // no persistence — always refetch
+  currency: persistReducer(authPersistConfig,currencyReducer)
 });
 
 export const store = configureStore({
