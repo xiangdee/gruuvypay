@@ -1,59 +1,94 @@
 {
   "expo": {
-    "name": "gruuvypay",
+    "name": "GruuvyPay",
     "slug": "gruuvypay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
+    "scheme": "gruuvypay",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1B4FD8"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.kemeasoude.gruuvypay",
+      "bundleIdentifier": "com.gruuvy.gruuvypay",
+      "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "NSCameraUsageDescription": "GruuvyPay needs camera access to scan QR codes and upload KYC documents.",
+        "NSPhotoLibraryUsageDescription": "GruuvyPay needs photo library access to upload KYC documents.",
+        "NSPhotoLibraryAddUsageDescription": "GruuvyPay needs permission to save receipts to your photos.",
+        "NSFaceIDUsageDescription": "GruuvyPay uses Face ID to keep your account secure.",
+        "NSContactsUsageDescription": "GruuvyPay needs contacts access to quickly find people to pay."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#1B4FD8"
       },
-      "googleServicesFile": "./google-services.json",
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
+      "package": "com.gruuvy.gruuvypay",
+      "versionCode": 1,
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ],
-      "package": "com.kemeasoude.gruuvypay"
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-font",
-      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1B4FD8",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "GruuvyPay"
+        }
+      ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow GruuvyPay to use Face ID for secure access"
+          "faceIDPermission": "GruuvyPay uses Face ID to keep your account secure."
         }
       ],
-      "@react-native-community/datetimepicker"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GruuvyPay needs photo library access to upload KYC documents.",
+          "cameraPermission": "GruuvyPay needs camera access to scan QR codes and upload KYC documents."
+        }
+      ],
+      "expo-font",
+      "expo-secure-store"
     ],
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "772ce636-a9ad-402c-8a60-06c6c8d901ca"
-      }
+    "experiments": {
+      "typedRoutes": true
     },
-    "owner": "kemeasoude"
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
   }
 }
