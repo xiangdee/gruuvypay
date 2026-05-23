@@ -1,3 +1,5 @@
+// src/api/client.ts
+//
 // Production-grade axios instance for GruuvyPay:
 //   - 10s request timeout
 //   - Automatic silent refresh on 401
@@ -5,18 +7,34 @@
 //   - X-Device-UA header on every request
 //   - Request queue during token refresh (no double refresh)
 
+import { ApiLink } from '@/constants/links';
+import { getDeviceUA } from '@/utils/device';
+import { secureStorage } from '@/utils/secure-storage';
 import axios, {
   AxiosInstance, AxiosError,
   InternalAxiosRequestConfig,
 } from 'axios';
+// ── Lazy store import to break require cycle ──────────────────────────────
+// client.ts → store → auth.slice → auth.api → client.ts (cycle!)
+// Solution: import store lazily inside interceptors, not at module level
+let _store: any;
+let _setAccessToken: any;
+let _clearAuth: any;
+
+function getStore() {
+  if (!_store) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const storeModule     = require('@/store');
+    const authSliceModule = require('@/store/slices/auth.slice');
+    _store           = storeModule.store;
+    _setAccessToken  = authSliceModule.setAccessToken;
+    _clearAuth       = authSliceModule.clearAuth;
+  }
+  return { store: _store, setAccessToken: _setAccessToken, clearAuth: _clearAuth };
+}
 
 
-import { secureStorage } from '@/utils/secure-storage';
-import { getDeviceUA } from '@/utils/device';
-import { store } from '@/store';
-import { setAccessToken, clearAuth } from '@/store/slices/auth.slice';
-
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.gruuvypay.com';
+const BASE_URL = ApiLink
 const TIMEOUT_MS = 10_000;    // 10 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_000; // 1 second base delay (doubles each retry)
@@ -54,8 +72,10 @@ export const apiClient: AxiosInstance = axios.create({
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    const { store } = getStore();
     const state = store.getState();
     const token = state.auth.accessToken;
+    
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -63,6 +83,8 @@ apiClient.interceptors.request.use(
 
     // X-Device-UA — parsed by server for session management
     config.headers['X-Device-UA'] = await getDeviceUA();
+
+    console.log('config', config);
 
     return config;
   },
@@ -74,8 +96,11 @@ apiClient.interceptors.request.use(
 // Handles network errors → retry with backoff
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => { 
+    
+    return response},
   async (error: AxiosError) => {
+
     const original = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
       _retryCount?: number;
@@ -85,8 +110,7 @@ apiClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !original._retry &&
-      !original.url?.includes('/auth/silent-refresh') &&
-      !original.url?.includes('/auth/login')
+      !original.url?.includes('/auth/')
     ) {
       if (isRefreshing) {
         // Queue this request until refresh completes
@@ -116,6 +140,7 @@ apiClient.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = res.data;
 
+        const { store, setAccessToken } = getStore();
         store.dispatch(setAccessToken(accessToken));
         await secureStorage.setRefreshToken(newRefreshToken);
 
@@ -125,7 +150,8 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         // Refresh failed — log out
-        store.dispatch(clearAuth());
+        const { store: s, clearAuth } = getStore();
+        s.dispatch(clearAuth());
         await secureStorage.clearAll();
         return Promise.reject(refreshError);
       } finally {
@@ -137,7 +163,9 @@ apiClient.interceptors.response.use(
     const isNetworkError = !error.response;
     const isServerError = (error.response?.status ?? 0) >= 500;
 
-    if ((isNetworkError || isServerError) && !original._retry) {
+    const isAuthRoute = original.url?.includes('/auth/');
+
+    if ((isNetworkError || isServerError) && !original._retry && !isAuthRoute) {
       original._retryCount = (original._retryCount ?? 0) + 1;
 
       if (original._retryCount <= MAX_RETRIES) {

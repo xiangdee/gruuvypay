@@ -36,6 +36,7 @@ export default function SetPinScreen() {
           ? <ActivityIndicator size="large" color={theme.brand.primary} style={styles.loader} />
           : (
             <PinInput
+              key={step}
               onComplete={onPinComplete}
               onRef={(api) => { pinRef.current = api; }}
               style={styles.pin}

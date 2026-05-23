@@ -19,22 +19,25 @@ interface BillAction {
 interface BillsRowProps {
   onAirtime:       () => void;
   onData:          () => void;
-  onBetting:        () => void;
-  onAirtimeToCash:  () => void;
+  onElectricity:   () => void;
+  onCable:         () => void;
+  onBetting:       () => void;
+  onAirtimeToCash: () => void;
   onViewAll:       () => void;
 }
 
 export function BillsRow({
-  onAirtime, onData, onBetting, onAirtimeToCash, onViewAll,
+  onAirtime, onData, onElectricity, onCable, onBetting, onAirtimeToCash, onViewAll,
 }: BillsRowProps) {
   const { theme } = useTheme();
 
   const actions: BillAction[] = [
-    { id: 'airtime',        label: 'Airtime',        icon: 'call-outline',       onPress: onAirtime       },
-    { id: 'data',           label: 'Data',            icon: 'wifi-outline',       onPress: onData          },
-
-    { id: 'betting',        label: 'Betting',           icon: 'game-controller-outline', onPress: onBetting       },
-    { id: 'airtime-cash',   label: 'Airtime\nTo Cash', icon: 'refresh-outline',  onPress: onAirtimeToCash },
+    { id: 'airtime',      label: 'Airtime',         icon: 'call-outline',            onPress: onAirtime       },
+    { id: 'data',         label: 'Data',             icon: 'wifi-outline',            onPress: onData          },
+    { id: 'electricity',  label: 'Electricity',      icon: 'flash-outline',           onPress: onElectricity   },
+    { id: 'cable',        label: 'Cable TV',         icon: 'tv-outline',              onPress: onCable         },
+    { id: 'betting',      label: 'Betting',          icon: 'game-controller-outline', onPress: onBetting       },
+    { id: 'airtime-cash', label: 'Airtime\nTo Cash', icon: 'refresh-outline',        onPress: onAirtimeToCash },
   ];
 
   return (

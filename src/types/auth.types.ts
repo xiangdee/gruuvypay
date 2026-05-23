@@ -47,7 +47,6 @@ export interface RegisterPayload {
 export interface LoginPayload {
   identifier:    string;   // username or email
   pin:           string;
-  deviceName:    string;
   deviceId?:     string;
   captchaToken?: string;
 }

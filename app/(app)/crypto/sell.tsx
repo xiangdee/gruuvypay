@@ -1,186 +1,204 @@
 // app/(app)/crypto/sell.tsx
-// Example sell screen — shows the full useLiveRate + RateChangedBanner pattern
-
-import React, { useState } from 'react';
+import React, { useRef, useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator,
-} from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Screen } from '@/components/layout/Screen';
-import { Button } from '@/components/ui/Button';
-import { ErrorCard } from '@/components/ui/ErrorCard';
+  TextInput,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons }     from "@expo/vector-icons";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useTheme, textStyles, spacing, radius } from "@/theme";
+import { cryptoApi }    from "@/api/crypto.api";
+import { useToast }     from "@/hooks/useToast";
+import { PinInput }     from "@/components/ui/PinInput";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
-import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { useLiveRate } from '@/hooks/useLiveRate';
-import { RateChangedBanner } from '@/components/crypto/crypto/RateChangedBanner';
+const COINS = [
+  { symbol: "BTC",  name: "Bitcoin",  icon: "₿", color: "#F7931A" },
+  { symbol: "ETH",  name: "Ethereum", icon: "Ξ", color: "#627EEA" },
+  { symbol: "USDT", name: "Tether",   icon: "₮", color: "#26A17B" },
+  { symbol: "SOL",  name: "Solana",   icon: "◎", color: "#9945FF" },
+];
 
-export default function SellCryptoScreen() {
+export default function CryptoSellScreen() {
   const { theme }  = useTheme();
-  const { symbol } = useLocalSearchParams<{ symbol: string }>();
+  const router     = useRouter();
+  const toast      = useToast();
+  const { symbol: defaultSymbol } = useLocalSearchParams<{ symbol?: string }>();
 
-  const [cryptoInput, setCryptoInput] = useState('');
-  const [fiatInput,   setFiatInput]   = useState('');
-  const [inputMode,   setInputMode]   = useState<'crypto' | 'fiat'>('crypto');
+  const [coin,         setCoin]         = useState(COINS.find(c => c.symbol === defaultSymbol) ?? COINS[0]);
+  const [cryptoAmount, setCryptoAmount] = useState("");
+  const [quote,        setQuote]        = useState<any>(null);
+  const [pinError,     setPinError]     = useState(false);
+  const [step,         setStep]         = useState<"form"|"quote"|"pin"|"success">("form");
+  const [loading,      setLoading]      = useState(false);
+  const [quoting,      setQuoting]      = useState(false);
+  const pinRef = useRef<{ shake: () => void; reset: () => void } | null>(null);
 
-  const {
-    rate, loading, error, fetchedAt,
-    rateChanged, changePct,
-    convert, convertReverse,
-    formatTo, formatFrom,
-    acceptNewRate, refresh,
-  } = useLiveRate(symbol ?? 'BTC', 'NGN', '₦');
-
-  // ─── Input handlers — all math is local, zero API calls ──────────────
-
-  function handleCryptoInput(val: string) {
-    setCryptoInput(val);
-    setInputMode('crypto');
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      setFiatInput(convert(num).toFixed(2));
-    } else {
-      setFiatInput('');
-    }
+  async function getQuote() {
+    const amt = parseFloat(cryptoAmount);
+    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    setQuoting(true);
+    try {
+      const amountNgn = amt * 1000; // approximate for quote — backend recalculates
+      const res = await cryptoApi.getQuote(coin.symbol, amountNgn, "sell");
+      setQuote({ ...res, cryptoAmount });
+      setStep("quote");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Could not get quote");
+    } finally { setQuoting(false); }
   }
 
-  function handleFiatInput(val: string) {
-    setFiatInput(val);
-    setInputMode('fiat');
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      const decimals = ['BTC', 'ETH'].includes(symbol) ? 8 : 4;
-      setCryptoInput(convertReverse(num).toFixed(decimals));
-    } else {
-      setCryptoInput('');
-    }
-  }
-
-  function handleConfirm() {
-    // TODO: call Quidax sell API
-  }
-
-  if (loading && !rate) {
-    return (
-      <Screen padded>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.brand.primary} />
-          <Text style={[textStyles.body, { color: theme.text.muted, marginTop: spacing[3] }]}>
-            Fetching live rate...
-          </Text>
-        </View>
-      </Screen>
-    );
+  async function sell(pin: string) {
+    setPinError(false);
+    setLoading(true);
+    try {
+      await cryptoApi.sell({ symbol: coin.symbol, cryptoAmount, pin });
+      setStep("success");
+    } catch (err: any) {
+      setPinError(true);
+      pinRef.current?.shake();
+      toast.error(err?.response?.data?.message ?? "Sell failed");
+    } finally { setLoading(false); }
   }
 
   return (
-    <Screen padded scrollable>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => {
+          if (step === "quote") setStep("form");
+          else if (step === "pin") setStep("quote");
+          else router.back();
+        }}>
+          <Ionicons name="arrow-back" size={24} color={theme.text.primary} />
+        </TouchableOpacity>
+        <Text style={[textStyles.h3, { color: theme.text.primary }]}>Sell Crypto</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-      {/* Rate change warning — shown when rate moves > 1% */}
-      {rateChanged && (
-        <RateChangedBanner
-          changePct={changePct}
-          fromSymbol={symbol ?? 'BTC'}
-          toSymbol="₦"
-          onAccept={acceptNewRate}
-        />
-      )}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-      {/* Error */}
-      {error && <ErrorCard message={error} style={{ marginBottom: spacing[4] }} />}
+        {step === "form" && (
+          <>
+            <Text style={[textStyles.label, { color: theme.text.secondary }]}>Select Coin to Sell</Text>
+            <View style={styles.coinRow}>
+              {COINS.map((c) => (
+                <TouchableOpacity
+                  key={c.symbol}
+                  onPress={() => { setCoin(c); setQuote(null); }}
+                  style={[styles.coinBtn, {
+                    backgroundColor: coin.symbol === c.symbol ? c.color + "20" : theme.bg.secondary,
+                    borderColor:     coin.symbol === c.symbol ? c.color : "transparent",
+                    borderWidth: 1.5,
+                  }]}
+                >
+                  <Text style={{ fontSize: 20, color: c.color }}>{c.icon}</Text>
+                  <Text style={[textStyles.labelSm, { color: theme.text.primary }]}>{c.symbol}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-      {/* Live rate display */}
-      <View style={[styles.rateRow, { backgroundColor: theme.bg.secondary }]}>
-        <Text style={[textStyles.bodySm, { color: theme.text.muted }]}>
-          1 {symbol} = ₦{rate?.toLocaleString('en-NG', { minimumFractionDigits: 2 }) ?? '...'}
-        </Text>
-        <View style={styles.rateRight}>
-          {fetchedAt && (
-            <Text style={[textStyles.caption, { color: theme.text.muted }]}>
-              Updated {fetchedAt.toLocaleTimeString()}
+            <Text style={[textStyles.label, { color: theme.text.secondary }]}>Amount ({coin.symbol})</Text>
+            <View style={[styles.amountInput, { backgroundColor: theme.bg.secondary, borderColor: theme.border.DEFAULT }]}>
+              <Text style={[textStyles.h3, { color: coin.color }]}>{coin.icon}</Text>
+              <TextInput
+                style={[textStyles.h2, { color: theme.text.primary, flex: 1 }]}
+                value={cryptoAmount} onChangeText={setCryptoAmount}
+                placeholder="0.00" placeholderTextColor={theme.text.muted}
+                keyboardType="decimal-pad"
+              />
+              <Text style={[textStyles.label, { color: theme.text.muted }]}>{coin.symbol}</Text>
+            </View>
+
+            <View style={[styles.infoBox, { backgroundColor: theme.bg.secondary }]}>
+              <Ionicons name="information-circle-outline" size={16} color={theme.text.muted} />
+              <Text style={[textStyles.caption, { color: theme.text.muted, flex: 1 }]}>
+                Selling applies a 1.5% spread. Proceeds are credited to your NGN wallet instantly.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.cta, { backgroundColor: theme.brand.primary }]}
+              onPress={getQuote} disabled={quoting}
+            >
+              {quoting ? <ActivityIndicator color="#000" /> : <Text style={[textStyles.label, { color: "#000" }]}>Get Quote</Text>}
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === "quote" && quote && (
+          <>
+            <View style={[styles.quoteCard, { backgroundColor: theme.bg.secondary }]}>
+              <Text style={[textStyles.label, { color: theme.text.secondary }]}>You sell</Text>
+              <Text style={[{ fontSize: 28, fontWeight: "700", color: coin.color }]}>{cryptoAmount} {coin.symbol}</Text>
+              <Ionicons name="arrow-down" size={24} color={theme.text.muted} style={{ marginVertical: spacing[2] }} />
+              <Text style={[textStyles.label, { color: theme.text.secondary }]}>You receive</Text>
+              <Text style={[textStyles.h1, { color: "#22C55E" }]}>₦{parseFloat(quote.amountNgn ?? "0").toLocaleString()}</Text>
+              <View style={styles.divider} />
+              {[
+                { label: "Exchange Rate", value: `₦${parseFloat(quote.rate ?? "0").toLocaleString()} per ${coin.symbol}` },
+                { label: "Platform Fee",  value: `${quote.platformFee} (₦${parseFloat(quote.fee ?? "0").toLocaleString()})` },
+              ].map((row, i) => (
+                <View key={i} style={styles.quoteRow}>
+                  <Text style={[textStyles.caption, { color: theme.text.muted }]}>{row.label}</Text>
+                  <Text style={[textStyles.caption, { color: theme.text.primary, fontWeight: "500" }]}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity style={[styles.cta, { backgroundColor: "#EF4444" }]} onPress={() => setStep("pin")}>
+              <Text style={[textStyles.label, { color: "#fff" }]}>Confirm Sell</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === "pin" && (
+          <View style={styles.center}>
+            <LoadingOverlay visible={loading} message="Processing sale..." />
+            <View style={[styles.summary, { backgroundColor: theme.bg.secondary }]}>
+              <Text style={{ fontSize: 36 }}>{coin.icon}</Text>
+              <Text style={[textStyles.h2, { color: theme.text.primary }]}>{cryptoAmount} {coin.symbol}</Text>
+              <Text style={[textStyles.body, { color: "#22C55E" }]}>→ ₦{parseFloat(quote?.amountNgn ?? "0").toLocaleString()}</Text>
+            </View>
+            <Text style={[textStyles.label, { color: theme.text.secondary, marginTop: spacing[6], marginBottom: spacing[3] }]}>Enter PIN to confirm</Text>
+            <PinInput
+              onComplete={sell}
+              error={pinError}
+              onRef={(api) => { pinRef.current = api; }}
+            />
+          </View>
+        )}
+
+        {step === "success" && (
+          <View style={styles.center}>
+            <Ionicons name="checkmark-circle" size={72} color="#22C55E" />
+            <Text style={[textStyles.h2, { color: theme.text.primary, marginTop: spacing[4] }]}>Sell Successful!</Text>
+            <Text style={[textStyles.body, { color: theme.text.secondary, marginTop: spacing[2], textAlign: "center" }]}>
+              ₦{parseFloat(quote?.amountNgn ?? "0").toLocaleString()} has been credited to your NGN wallet
             </Text>
-          )}
-          <TouchableOpacity onPress={refresh}>
-            <Ionicons name="refresh-outline" size={14} color={theme.text.muted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Crypto amount input */}
-      <View style={[styles.inputCard, { backgroundColor: theme.bg.secondary }]}>
-        <Text style={[textStyles.labelSm, { color: theme.text.muted }]}>
-          You sell
-        </Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            value={cryptoInput}
-            onChangeText={handleCryptoInput}
-            placeholder="0"
-            placeholderTextColor={theme.text.muted}
-            keyboardType="decimal-pad"
-            style={[textStyles.h2, { color: theme.text.primary, flex: 1 }]}
-          />
-          <Text style={[textStyles.h3, { color: theme.text.secondary }]}>
-            {symbol}
-          </Text>
-        </View>
-      </View>
-
-      {/* Arrow */}
-      <View style={styles.arrowRow}>
-        <Ionicons name="arrow-down" size={20} color={theme.text.muted} />
-      </View>
-
-      {/* NGN amount input */}
-      <View style={[styles.inputCard, { backgroundColor: theme.bg.secondary }]}>
-        <Text style={[textStyles.labelSm, { color: theme.text.muted }]}>
-          You receive
-        </Text>
-        <View style={styles.inputRow}>
-          <Text style={[textStyles.h2, { color: theme.text.secondary }]}>₦</Text>
-          <TextInput
-            value={fiatInput}
-            onChangeText={handleFiatInput}
-            placeholder="0.00"
-            placeholderTextColor={theme.text.muted}
-            keyboardType="decimal-pad"
-            style={[textStyles.h2, { color: theme.text.primary, flex: 1 }]}
-          />
-        </View>
-      </View>
-
-      {/* Confirm — disabled if rate has changed and user hasn't accepted */}
-      <View style={styles.cta}>
-        <Button
-          label={rateChanged ? 'Accept new rate first' : `Sell ${symbol}`}
-          onPress={handleConfirm}
-          disabled={rateChanged || !cryptoInput || !rate}
-          variant={rateChanged ? 'secondary' : 'primary'}
-        />
-      </View>
-
-    </Screen>
+            <TouchableOpacity style={[styles.cta, { backgroundColor: theme.brand.primary, marginTop: spacing[6] }]} onPress={() => router.back()}>
+              <Text style={[textStyles.label, { color: "#000" }]}>View Portfolio</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={{ height: spacing[8] }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  center:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  rateRow:  {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    alignItems:     'center',
-    borderRadius:   radius.lg,
-    padding:        spacing[3],
-    marginBottom:   spacing[4],
-  },
-  rateRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  inputCard: {
-    borderRadius:      radius.xl,
-    padding:           spacing[4],
-    marginBottom:      spacing[2],
-  },
-  inputRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[2] },
-  arrowRow:  { alignItems: 'center', marginVertical: spacing[1] },
-  cta:       { marginTop: spacing[6] },
+  safe: { flex: 1 }, topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing[4] },
+  content: { padding: spacing[4], gap: spacing[4] },
+  coinRow: { flexDirection: "row", gap: spacing[2] },
+  coinBtn: { flex: 1, alignItems: "center", borderRadius: radius.xl, padding: spacing[3], gap: spacing[1] },
+  amountInput: { flexDirection: "row", alignItems: "center", gap: spacing[2], borderRadius: radius.xl, borderWidth: 1, paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
+  infoBox: { flexDirection: "row", gap: spacing[2], borderRadius: radius.xl, padding: spacing[3] },
+  cta: { padding: spacing[4], borderRadius: radius.xl, alignItems: "center" },
+  quoteCard: { borderRadius: radius.xl, padding: spacing[5], alignItems: "center", gap: spacing[2] },
+  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.06)", width: "100%", marginVertical: spacing[2] },
+  quoteRow: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+  center: { alignItems: "center", paddingTop: spacing[4], width: "100%" },
+  summary: { width: "100%", borderRadius: radius.xl, padding: spacing[5], alignItems: "center", gap: spacing[2] },
 });

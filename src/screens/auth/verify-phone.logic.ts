@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppDispatch } from '@/store/hooks';
 import { authApi } from '@/api/auth.api';
@@ -11,18 +11,22 @@ export function useVerifyPhoneLogic() {
   const router   = useRouter();
   const toast    = useToast();
 
-  // Phone and pinId passed from add-phone screen
-  const { phone, pinId } = useLocalSearchParams<{ phone: string; pinId: string }>();
+  const { phone, pinId: initialPinId } = useLocalSearchParams<{ phone: string; pinId: string }>();
+  const [currentPinId, setCurrentPinId] = useState(initialPinId);
 
   const otpRef = useRef<{ reset: () => void } | null>(null);
   const timer  = useOtpTimer({ id: 'verify-phone', cooldownSeconds: 60 });
 
+  useEffect(() => {
+    timer.startTimer();
+  }, []);
+
   async function onOtpComplete(otp: string) {
     try {
-      await authApi.verifyPhone({ phone, otp, pinId });
+      await authApi.verifyPhone({ phone, otp, pinId: currentPinId });
       dispatch(setOnboardingStep('PIN'));
       toast.success('Phone verified!', 'Now set your PIN');
-      // Route guard handles navigation to set-pin
+      router.replace('/(auth)/set-pin' as any);
     } catch (err: any) {
       toast.error('Invalid code', err?.message ?? 'Please try again');
       otpRef.current?.reset();
@@ -32,10 +36,9 @@ export function useVerifyPhoneLogic() {
   async function resend() {
     try {
       const res = await authApi.sendPhoneOtp(phone);
+      setCurrentPinId(res.pinId);
       timer.startTimer();
       toast.success('Code resent', `Check ${phone}`);
-      // Note: pinId changes on resend — need to update params
-      // In a real app, navigate back to add-phone or update pinId in state
     } catch (err: any) {
       toast.error('Failed to resend', err?.message);
     }

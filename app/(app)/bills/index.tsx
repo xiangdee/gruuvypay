@@ -1,76 +1,108 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, textStyles, spacing, radius } from '@/theme';
+import React from "react";
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons }     from "@expo/vector-icons";
+import { useRouter }    from "expo-router";
+import { useTheme, textStyles, spacing, radius } from "@/theme";
+import { S3Link } from "@/constants/links";
 
 const CATEGORIES = [
-  { id: 'airtime',     label: 'Airtime',         icon: 'call-outline',            color: '#FFCC00', route: '/(app)/bills/airtime'     },
-  { id: 'data',        label: 'Data',             icon: 'wifi-outline',            color: '#007A00', route: '/(app)/bills/data'         },
-  { id: 'electricity', label: 'Electricity',      icon: 'flash-outline',           color: '#FF6600', route: '/(app)/bills/electricity'  },
-  { id: 'cable',       label: 'Cable TV',         icon: 'tv-outline',              color: '#003087', route: '/(app)/bills/cable'        },
-  { id: 'betting',     label: 'Betting',           icon: 'game-controller-outline', color: '#00AA00', route: '/(app)/bills/betting'          },
-  { id: 'airtime-cash',label: 'Airtime to Cash',  icon: 'swap-horizontal-outline', color: '#6366F1', route: '/(app)/bills/airtime-to-cash'  },
+  {
+    id: "airtime", label: "Airtime", icon: "call-outline",
+    color: "#22C55E", bg: "#F0FDF4", route: "/(app)/bills/airtime",
+    logos: [
+      S3Link +"/bill-providers/mtn.png",
+       S3Link +"/bill-providers/airtel.png",
+       S3Link +"/bill-providers/glo.png",
+       S3Link +"/bill-providers/9mobile.png",
+    ],
+  },
+  {
+    id: "data", label: "Data", icon: "wifi-outline",
+    color: "#3B82F6", bg: "#EFF6FF", route: "/(app)/bills/data",
+    logos: [
+       S3Link +"/bill-providers/mtn.png",
+       S3Link +"/bill-providers/airtel.png",
+       S3Link +"/bill-providers/glo.png",
+       S3Link +"/bill-providers/9mobile.png",
+    ],
+  },
+  { id: "electricity", label: "Electricity", icon: "flash-outline",    color: "#F59E0B", bg: "#FFFBEB", route: "/(app)/bills/electricity", logos: [] },
+  { id: "cable",       label: "Cable TV",    icon: "tv-outline",        color: "#8B5CF6", bg: "#F5F3FF", route: "/(app)/bills/cable",       logos: [] },
+  { id: "betting",     label: "Betting",     icon: "trophy-outline",    color: "#EC4899", bg: "#FDF2F8", route: "/(app)/bills/betting",     logos: [] },
+  { id: "airtime-to-cash", label: "Airtime 2 Cash", icon: "swap-horizontal-outline", color: "#06B6D4", bg: "#ECFEFF", route: "/(app)/bills/airtime-to-cash", logos: [] },
 ];
 
-export default function BillsIndexScreen() {
+export default function BillsHubScreen() {
   const { theme } = useTheme();
   const router    = useRouter();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={theme.text.primary} />
-        </TouchableOpacity>
-        <Text style={[textStyles.h3, { color: theme.text.primary }]}>Bills & Services</Text>
-        <View style={styles.backBtn} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        <View style={styles.header}>
+          <Text style={[textStyles.h2, { color: theme.text.primary }]}>Bill Payments</Text>
+          <Text style={[textStyles.body, { color: theme.text.secondary, marginTop: spacing[1] }]}>
+            Pay instantly with your GruuvyPay wallet
+          </Text>
+        </View>
+
         <View style={styles.grid}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.id}
-              onPress={() => router.push(cat.route as any)}
               style={[styles.card, { backgroundColor: theme.bg.secondary }]}
-              activeOpacity={0.7}
+              onPress={() => router.push(cat.route as any)}
+              activeOpacity={0.75}
             >
-              <View style={[styles.iconWrap, { backgroundColor: cat.color + '20' }]}>
-                <Ionicons name={cat.icon as any} size={28} color={cat.color} />
+              <View style={[styles.iconWrap, { backgroundColor: cat.bg }]}>
+                <Ionicons name={cat.icon as any} size={26} color={cat.color} />
               </View>
               <Text style={[textStyles.label, { color: theme.text.primary, marginTop: spacing[2] }]}>
                 {cat.label}
               </Text>
+              {cat.logos.length > 0 && (
+                <View style={styles.logoRow}>
+                  {cat.logos.map((uri, i) => (
+                    <Image key={i} source={{ uri }} style={styles.logo} resizeMode="contain" />
+                  ))}
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
+
+        <View style={[styles.tips, { backgroundColor: theme.bg.secondary }]}>
+          {[
+            { icon: "shield-checkmark-outline", text: "All payments are instant and secured" },
+            { icon: "refresh-outline",          text: "Failed payments are automatically refunded" },
+            { icon: "receipt-outline",          text: "Electricity tokens sent via push notification and email" },
+          ].map((t, i) => (
+            <View key={i} style={styles.tip}>
+              <Ionicons name={t.icon as any} size={16} color={theme.brand.primary} />
+              <Text style={[textStyles.caption, { color: theme.text.secondary, flex: 1, lineHeight: 18 }]}>{t.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ height: spacing[8] }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4], paddingVertical: spacing[4],
-  },
-  backBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  safe:     { flex: 1 },
   content:  { padding: spacing[4] },
-  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
-  card: {
-    width: '47%',
-    borderRadius: radius.xl,
-    padding: spacing[4],
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 60, height: 60,
-    borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  header:   { marginBottom: spacing[5] },
+  grid:     { flexDirection: "row", flexWrap: "wrap", gap: spacing[3], marginBottom: spacing[5] },
+  card:     { width: "47%", borderRadius: radius.xl, padding: spacing[4], gap: spacing[1] },
+  iconWrap: { width: 52, height: 52, borderRadius: radius.xl, alignItems: "center", justifyContent: "center" },
+  logoRow:  { flexDirection: "row", gap: spacing[1], marginTop: spacing[2], flexWrap: "wrap" },
+  logo:     { width: 22, height: 22, borderRadius: 4, backgroundColor: "#f0f0f0" },
+  tips:     { borderRadius: radius.xl, padding: spacing[4], gap: spacing[3] },
+  tip:      { flexDirection: "row", alignItems: "flex-start", gap: spacing[2] },
 });

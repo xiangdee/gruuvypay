@@ -31,6 +31,7 @@ interface WalletState {
   txPage:          number;
   txTotal:         number;
   txLoading:       boolean;
+  txHasMore:       boolean; 
   loading:         boolean;
   dailySpentNaira: number;         // total NGN sent today — for tier limit display
   error:           string | null;
@@ -38,19 +39,20 @@ interface WalletState {
 }
 
 const initialState: WalletState = {
-  balance:         null,
-  balanceRaw:      null,
-  currency:        'NGN',
-  balanceVisible:  true,
-  virtualAccount:  null,
-  vaLoading:       false,
-  transactions:    [],
-  txPage:          1,
-  txTotal:         0,
-  txLoading:       false,
-  loading:         false,
+  balance: null,
+  balanceRaw: null,
+  currency: 'NGN',
+  balanceVisible: true,
+  virtualAccount: null,
+  vaLoading: false,
+  transactions: [],
+  txPage: 1,
+  txTotal: 0,
+  txLoading: false,
+  loading: false,
   dailySpentNaira: 0,
-  error:           null,
+  error: null,
+  txHasMore: false
 };
 
 // ─── Thunks ───────────────────────────────────────────────────────────
@@ -79,9 +81,9 @@ export const fetchVirtualAccount = createAsyncThunk(
 
 export const fetchTransactions = createAsyncThunk(
   'wallet/fetchTransactions',
-  async ({ page = 1, limit = 20 }: { page?: number; limit?: number }, { rejectWithValue }) => {
+  async ({ page = 1, limit = 20 ,type}: { page?: number; limit?: number, type?: string }, { rejectWithValue }) => {
     try {
-      return await walletApi.getTransactions(page, limit);
+      return await walletApi.getTransactions(page, limit,type);
     } catch (err: any) {
       return rejectWithValue(err.message);
     }
@@ -107,9 +109,24 @@ export const sendToTag = createAsyncThunk(
     }
   },
 );
+export const fetchMoreTransactions = createAsyncThunk(
+  'wallet/fetchMoreTransactions',
+  async (
+    { type }: { type?: string },
+    { getState, rejectWithValue },
+  ) => {
+    try {
+      const state = getState() as { wallet: { txPage: number; txHasMore: boolean } };
+      if (!state.wallet.txHasMore) return null;
+      const nextPage = state.wallet.txPage + 1;
+      return await walletApi.getTransactions(nextPage, 20, type);
+    } catch (err: any) {
+      return rejectWithValue(err.message);
+    }
+  },
+);
 
 // ─── Slice ────────────────────────────────────────────────────────────
-
 const walletSlice = createSlice({
   name: 'wallet',
   initialState,
@@ -135,15 +152,15 @@ const walletSlice = createSlice({
       .addCase(fetchBalance.pending, (state) => { state.loading = true; })
       .addCase(fetchBalance.fulfilled, (state, action) => {
         state.loading = false;
-        state.balance = action.payload.formatted;
-        state.balanceRaw = action.payload.balance;
+        state.balance = action.payload.balance;
+        state.balanceRaw = action.payload.balanceRaw;
         state.currency = action.payload.currency;
       })
       .addCase(fetchBalance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
-
+ 
     builder
       .addCase(fetchVirtualAccount.pending, (state) => {
         state.vaLoading = true;
@@ -155,7 +172,7 @@ const walletSlice = createSlice({
       .addCase(fetchVirtualAccount.rejected, (state) => {
         state.vaLoading = false;
       });
-
+ 
     builder
       .addCase(fetchTransactions.pending, (state) => { state.txLoading = true; })
       .addCase(fetchTransactions.fulfilled, (state, action) => {
@@ -163,15 +180,31 @@ const walletSlice = createSlice({
         const { transactions, pagination } = action.payload;
         state.transactions = pagination.page === 1
           ? transactions
-          : [...state.transactions, ...transactions]; // append for pagination
-        state.txPage = pagination.page;
-        state.txTotal = pagination.total;
+          : [...state.transactions, ...transactions];
+        state.txPage    = pagination.page;
+        state.txTotal   = pagination.total;
+        state.txHasMore = transactions.length === (pagination.limit ?? 20) &&
+          state.transactions.length < pagination.total;
       })
       .addCase(fetchTransactions.rejected, (state, action) => {
         state.txLoading = false;
         state.error = action.payload as string;
       });
-
+ 
+    builder
+      .addCase(fetchMoreTransactions.pending, (state) => { state.txLoading = true; })
+      .addCase(fetchMoreTransactions.fulfilled, (state, action) => {
+        state.txLoading = false;
+        if (!action.payload) return;
+        const { transactions, pagination } = action.payload;
+        state.transactions = [...state.transactions, ...transactions];
+        state.txPage       = pagination.page;
+        state.txTotal      = pagination.total;
+        state.txHasMore    = transactions.length === (pagination.limit ?? 20) &&
+          state.transactions.length < pagination.total;
+      })
+      .addCase(fetchMoreTransactions.rejected, (state) => { state.txLoading = false; });
+ 
     builder
       .addCase(sendToTag.fulfilled, (state, action) => {
         state.balance    = action.payload.newBalance;
@@ -181,6 +214,8 @@ const walletSlice = createSlice({
       });
   },
 });
+ 
 
 export const { toggleBalanceVisibility, clearWalletError, applyCredit, resetDailySpend } = walletSlice.actions;
+
 export default walletSlice.reducer;

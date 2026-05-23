@@ -8,16 +8,17 @@ import { useTheme, textStyles, spacing, radius, layout } from '@/theme';
 import { useInputLogic } from './Input.logic';
 
 interface InputProps extends TextInputProps {
-  label?:       string;
-  error?:       string;
-  hint?:        string;
-  leftIcon?:    React.ReactNode;
-  secureEntry?: boolean;   // shows eye toggle
+  label?:        string;
+  error?:        string;
+  hint?:         string;
+  leftIcon?:     React.ReactNode;
+  rightElement?: React.ReactNode;
+  secureEntry?:  boolean;   // shows eye toggle
   containerStyle?: ViewStyle;
 }
 
 export function Input({
-  label, error, hint, leftIcon, secureEntry,
+  label, error, hint, leftIcon, rightElement, secureEntry,
   containerStyle, ...props
 }: InputProps) {
   const { theme } = useTheme();
@@ -67,6 +68,10 @@ export function Input({
           placeholderTextColor={theme.text.muted}
           selectionColor={theme.brand.primary}
         />
+
+        {rightElement && (
+          <View style={styles.rightIcon}>{rightElement}</View>
+        )}
 
         {secureEntry && (
           <TouchableOpacity onPress={toggleShowValue} style={styles.rightIcon}>

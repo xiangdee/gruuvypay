@@ -2,15 +2,15 @@
   "expo": {
     "name": "GruuvyPay",
     "slug": "gruuvypay",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon2.png",
     "scheme": "gruuvypay",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1B4FD8"
+      "backgroundColor": "#000000"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -32,8 +32,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#1B4FD8"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#EBEBDE"
       },
       "package": "com.gruuvy.gruuvypay",
       "versionCode": 1,
@@ -45,22 +45,23 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.VIBRATE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO"
       ],
       "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/adaptive-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#1B4FD8",
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#EBEBDE",
           "sounds": [],
           "androidMode": "default",
           "androidCollapsedTitle": "GruuvyPay"
@@ -88,7 +89,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "772ce636-a9ad-402c-8a60-06c6c8d901ca"
       }
-    }
+    },
+    "owner": "kemeasoude"
   }
 }

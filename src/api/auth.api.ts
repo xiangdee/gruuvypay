@@ -71,6 +71,36 @@ export const authApi = {
     return data;
   },
 
+  //sessions
+  getSessions: async () => {
+    const { data } = await apiClient.get('/auth/sessions');
+    return data;
+  },
+  // delete
+  revokeSession: async (sessionId: string) => {
+    const { data } = await apiClient.post('/auth/sessions/revoke', { sessionId });
+    return data;
+  },
+
+  // ── 2FA Management ────────────────────────────────────────────────
+  setup2fa: async (type: 'email' | 'authy'): Promise<{
+    type: string; message: string;
+    qrcode?: string; secret?: string; backupCodes?: string[]; token?: string;
+  }> => {
+    const { data } = await apiClient.post('/auth/2fa/setup', { type });
+    return data;
+  },
+
+  confirm2fa: async (payload: { code: string; token?: string }): Promise<{ message: string }> => {
+    const { data } = await apiClient.post('/auth/2fa/confirm', payload);
+    return data;
+  },
+
+  disable2fa: async (pin: string): Promise<{ message: string }> => {
+    const { data } = await apiClient.post('/auth/2fa/disable', { pin });
+    return data;
+  },
+
   // CSRF
   getCsrfToken: async (): Promise<string> => {
     const { data } = await apiClient.get('/auth/csrf');

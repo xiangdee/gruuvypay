@@ -48,7 +48,7 @@ export const login = createAsyncThunk(
   async (payload: LoginPayload, { rejectWithValue }) => {
     try {
       const res = await authApi.login(payload);
-      if ('type' in res && res.type === 'twoFa') return res; // 2FA challenge
+      if ('type' in res && res.type === 'twoFa') return res; // handled by component, no token
       await secureStorage.setRefreshToken((res as any).refreshToken);
       return res;
     } catch (err: any) {
@@ -68,6 +68,18 @@ export const silentRefresh = createAsyncThunk(
       return res;
     } catch (err: any) {
       return rejectWithValue(err.message ?? 'Session expired');
+    }
+  },
+);
+
+export const fetchUser = createAsyncThunk(
+  'auth/fetchUser',
+  async (_, { rejectWithValue }) => {
+    try {
+
+      return await authApi.getMe();
+    } catch (err: any) {
+      return rejectWithValue(err.message ?? 'Failed to fetch user');
     }
   },
 );
@@ -149,10 +161,12 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
         const payload = action.payload as any;
-        if (payload.type === 'twoFa') return; // handled by component
-        state.accessToken = payload.accessToken;
-        state.user = payload.user;
-        state.onboardingStep = payload.user.onboardingStep;
+        if (payload.type === 'twoFa') return; // handled by component, no token yet
+        // 'incomplete' and normal success both have accessToken + user — store them the same way.
+        // useRootLayout route guard reads onboardingStep and navigates to the right screen.
+        state.accessToken     = payload.accessToken;
+        state.user            = payload.user;
+        state.onboardingStep  = payload.user?.onboardingStep ?? null;
         state.isAuthenticated = true;
       })
       .addCase(login.rejected, (state, action) => {
@@ -170,6 +184,13 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.accessToken = null;
         state.user = null;
+      });
+
+      //fetch user
+      builder
+      .addCase(fetchUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+       
       });
 
     // Logout

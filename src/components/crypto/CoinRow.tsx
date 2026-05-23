@@ -65,14 +65,14 @@ export function CoinRow({ price, onPress, onBuy }: CoinRowProps) {
       </View>
 
       {/* Buy button */}
-      <TouchableOpacity
+      {/* <TouchableOpacity
         onPress={onBuy}
         style={[styles.buyBtn, { backgroundColor: theme.brand.primary + '20' }]}
       >
         <Text style={[textStyles.labelSm, { color: theme.brand.primary }]}>
           Buy
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </TouchableOpacity>
   );
 }

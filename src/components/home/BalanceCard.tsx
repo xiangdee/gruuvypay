@@ -1,222 +1,114 @@
-// The blue top section from screenshots:
-// NGN pill, balance with eye toggle, currency flag
-
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
-  View, Text, TouchableOpacity,
-  Animated, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { palette } from '@/theme/colors';
-import { useBalanceCardLogic } from './BalanceCard.logic';
+import { useTheme, spacing, radius, textStyles } from '@/theme';
 
+const CARD_W = Dimensions.get('window').width - spacing[8];
 
 interface BalanceCardProps {
-  balance:    string | null;
-  visible:    boolean;
-  loading:    boolean;
-  onToggle:   () => void;
-  username:   string;
-  greeting:   string;
-  onRewards?: () => void;
-  onChat?:    () => void;
+  balance:   string | null;
+  visible:   boolean;
+  currency?: string;
+  onToggle:  () => void;
 }
 
-const NGN_FLAG = '🇳🇬';
-
-export function BalanceCard({
-  balance, visible, loading,
-  onToggle, username, greeting,
-  onRewards, onChat,
-}: BalanceCardProps) {
+export function BalanceCard({ balance, visible, currency = 'NGN', onToggle }: BalanceCardProps) {
   const { theme } = useTheme();
-  const insets    = useSafeAreaInsets();
-  const { fadeAnim, animateToggle } = useBalanceCardLogic(visible);
-
-  useEffect(() => {
-    animateToggle(visible);
-  }, [visible]);
-
-  const displayBalance = visible
-    ? (balance ?? '₦0.00')
-    : '••••••';
-
-  // Avatar initials
-  const initials = username?.replace('@', '').slice(0, 1).toUpperCase() ?? 'G';
 
   return (
     <View style={[
-      styles.container,
-      {
-        backgroundColor: theme.brand.primary,
-        paddingTop: insets.top + spacing[4],
-      },
+      styles.card,
+      { backgroundColor: theme.bg.secondary, borderColor: theme.border.DEFAULT },
     ]}>
+      {/* Decorative glow circles */}
+      <View style={[styles.circle1, { backgroundColor: theme.brand.accent }]} />
+      <View style={[styles.circle2, { backgroundColor: theme.brand.accent }]} />
 
-      {/* Top row — avatar, greeting, chat, rewards */}
+      {/* Top row: currency pill + eye toggle */}
       <View style={styles.topRow}>
-        <View style={styles.userRow}>
-          {/* Avatar */}
-          <View style={[styles.avatar, { backgroundColor: palette.white }]}>
-            <Text style={[textStyles.label, { color: theme.brand.primary }]}>
-              {initials}
-            </Text>
-          </View>
-          <Text style={[textStyles.bodyLg, { color: palette.white }]}>
-            Hi, {username?.replace('@', '')}!
-          </Text>
+        <View style={[styles.currencyPill, { backgroundColor: theme.bg.card }]}>
+          <Text style={styles.flag}>🇳🇬</Text>
+          <Text style={[textStyles.labelSm, { color: theme.text.primary }]}>{currency}</Text>
+          <Ionicons name="chevron-down" size={12} color={theme.text.muted} />
         </View>
-
-        <View style={styles.topActions}>
-          {/* Chat */}
-          <TouchableOpacity
-            onPress={onChat}
-            style={[styles.iconBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
-          >
-            <Ionicons name="chatbubble-outline" size={18} color={palette.white} />
-          </TouchableOpacity>
-
-          {/* Rewards */}
-          <TouchableOpacity
-            onPress={onRewards}
-            style={[styles.rewardsBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
-          >
-            <Ionicons name="gift-outline" size={16} color={palette.white} />
-            <Text style={[textStyles.labelSm, { color: palette.white }]}>
-              Rewards
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Currency selector pill */}
-      <View style={styles.currencyRow}>
         <TouchableOpacity
-          style={[styles.currencyPill, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+          onPress={onToggle}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={{ fontSize: 16 }}>{NGN_FLAG}</Text>
-          <Text style={[textStyles.label, { color: palette.white }]}>NGN</Text>
-          <Ionicons name="chevron-down" size={14} color={palette.white} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Balance */}
-      <View style={styles.balanceRow}>
-        {loading && !balance
-          ? (
-            <View style={styles.balanceSkeleton} />
-          )
-          : (
-            <Animated.Text
-              style={[
-                styles.balanceText,
-                { color: palette.white, opacity: 1 },
-              ]}
-            >
-              {displayBalance}
-            </Animated.Text>
-          )
-        }
-
-        {/* Eye toggle */}
-        <TouchableOpacity onPress={onToggle} style={styles.eyeBtn}>
           <Ionicons
             name={visible ? 'eye-off-outline' : 'eye-outline'}
-            size={22}
-            color="rgba(255,255,255,0.7)"
+            size={20}
+            color={theme.text.muted}
           />
         </TouchableOpacity>
       </View>
 
-      {/* Bottom curve */}
-      <View style={styles.curve} />
+      {/* Balance */}
+      <Text style={[styles.balanceLabel, { color: theme.text.muted }]}>TOTAL BALANCE</Text>
+      <Text style={[styles.balanceAmount, { color: theme.text.primary }]}>
+        {visible ? (balance ?? '₦0.00') : '₦ ••••••'}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing[5],
-    paddingBottom:     spacing[8],
+  card: {
+    width:         CARD_W,
+    height:        180,
+    borderRadius:  radius['2xl'],
+    padding:       spacing[5],
+    overflow:      'hidden',
+    borderWidth:   1,
+    shadowColor:   '#000',
+    shadowOpacity: 0.12,
+    shadowRadius:  16,
+    shadowOffset:  { width: 0, height: 6 },
+    elevation:     6,
+  },
+  circle1: {
+    position:     'absolute',
+    width:        180,
+    height:       180,
+    borderRadius: 90,
+    opacity:      0.08,
+    top:          -60,
+    right:        -40,
+  },
+  circle2: {
+    position:     'absolute',
+    width:        120,
+    height:       120,
+    borderRadius: 60,
+    opacity:      0.05,
+    bottom:       -40,
+    left:         20,
   },
   topRow: {
     flexDirection:  'row',
-    alignItems:     'center',
     justifyContent: 'space-between',
-    marginBottom:   spacing[4],
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           spacing[2],
-  },
-  avatar: {
-    width:          40,
-    height:         40,
-    borderRadius:   radius.full,
     alignItems:     'center',
-    justifyContent: 'center',
-  },
-  topActions: {
-    flexDirection: 'row',
-    gap:           spacing[2],
-  },
-  iconBtn: {
-    width:          36,
-    height:         36,
-    borderRadius:   radius.full,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  rewardsBtn: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    gap:              spacing[1],
-    paddingHorizontal: spacing[3],
-    paddingVertical:   spacing[1.5],
-    borderRadius:     radius['3xl'],
-  },
-  currencyRow: {
-    alignItems:    'center',
-    marginBottom:  spacing[2],
+    marginBottom:   spacing[5],
   },
   currencyPill: {
     flexDirection:    'row',
     alignItems:       'center',
-    gap:              spacing[1.5],
-    paddingHorizontal: spacing[4],
-    paddingVertical:   spacing[1.5],
-    borderRadius:     radius['3xl'],
+    gap:              spacing[1],
+    paddingHorizontal: spacing[3],
+    paddingVertical:  spacing[1],
+    borderRadius:     radius.full,
   },
-  balanceRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            spacing[3],
-    marginBottom:   spacing[2],
+  flag:         { fontSize: 14 },
+  balanceLabel: {
+    ...textStyles.labelSm,
+    letterSpacing: 1.5,
+    marginBottom:  spacing[1],
   },
-  balanceText: {
-    fontSize:      40,
+  balanceAmount: {
+    fontSize:      34,
     fontWeight:    '800',
-    letterSpacing: -1,
-  },
-  balanceSkeleton: {
-    width:        180,
-    height:       44,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  eyeBtn: {
-    padding: spacing[1],
-  },
-  curve: {
-    position:       'absolute',
-    bottom:         -24,
-    left:           0,
-    right:          0,
-    height:         48,
-    backgroundColor: 'inherit',
+    letterSpacing: -0.5,
   },
 });

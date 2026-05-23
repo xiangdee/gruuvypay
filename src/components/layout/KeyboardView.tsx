@@ -2,7 +2,7 @@ import React from 'react';
 import {
   KeyboardAvoidingView, Platform,
   TouchableWithoutFeedback, Keyboard,
-  ScrollView, StyleSheet, ViewStyle,
+  ScrollView, View, StyleSheet, ViewStyle,
 } from 'react-native';
 
 interface KeyboardViewProps {
@@ -29,7 +29,7 @@ export function KeyboardView({ children, style, scrollable }: KeyboardViewProps)
               {children}
             </ScrollView>
           )
-          : <>{children}</>
+          : <View style={styles.flex}>{children}</View>
         }
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>

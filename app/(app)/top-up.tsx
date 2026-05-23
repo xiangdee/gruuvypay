@@ -66,6 +66,29 @@ export default function TopUpScreen() {
           </View>
         )}
 
+        {/* No virtual account — prompt BVN verification */}
+        {!loading && !va && (
+          <View style={styles.noVaWrap}>
+            <View style={[styles.noVaIcon, { backgroundColor: theme.bg.secondary }]}>
+              <Ionicons name="card-outline" size={48} color={theme.text.muted} />
+            </View>
+            <Text style={[textStyles.h3, { color: theme.text.primary, marginTop: spacing[4], textAlign: 'center' }]}>
+              No Virtual Account Yet
+            </Text>
+            <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
+              Complete BVN verification to get a dedicated bank account for instant wallet top-ups.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/kyc' as any)}
+              style={[styles.kycBtn, { backgroundColor: theme.brand.primary }]}
+              activeOpacity={0.85}
+            >
+              <Text style={[textStyles.label, { color: '#000' }]}>Verify BVN to Continue</Text>
+              <Ionicons name="arrow-forward" size={18} color="#000" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Virtual Account Card */}
         {va && (
           <>
@@ -73,34 +96,34 @@ export default function TopUpScreen() {
               {/* Card header */}
               <View style={styles.cardHeader}>
                 <View>
-                  <Text style={[textStyles.caption, { color: 'rgba(255,255,255,0.6)', letterSpacing: 0.8 }]}>
+                  <Text style={[textStyles.caption, { color: 'rgba(15, 8, 8, 0.6)', letterSpacing: 0.8 }]}>
                     BANK NAME
                   </Text>
-                  <Text style={[textStyles.label, { color: '#fff', marginTop: 2 }]}>
+                  <Text style={[textStyles.label, { color: '#000', marginTop: 2 }]}>
                     {va.bankName}
                   </Text>
                 </View>
                 <View style={[styles.cardChip, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                  <Text style={[textStyles.labelSm, { color: '#fff' }]}>NGN</Text>
+                  <Text style={[textStyles.labelSm, { color: '#000' }]}>NGN</Text>
                 </View>
               </View>
 
               {/* Account number — big and prominent */}
               <View style={styles.accountNumberWrap}>
-                <Text style={[textStyles.caption, { color: 'rgba(255,255,255,0.6)', letterSpacing: 0.8 }]}>
+                <Text style={[textStyles.caption, { color: 'rgba(15, 8, 8, 0.6)', letterSpacing: 0.8 }]}>
                   ACCOUNT NUMBER
                 </Text>
-                <Text style={[styles.accountNumber, { color: '#fff' }]}>
+                <Text style={[styles.accountNumber, { color: '#000' }]}>
                   {va.accountNumber.replace(/(.{4})/g, '$1 ').trim()}
                 </Text>
               </View>
 
               {/* Account name */}
               <View>
-                <Text style={[textStyles.caption, { color: 'rgba(255,255,255,0.6)', letterSpacing: 0.8 }]}>
+                <Text style={[textStyles.caption, { color: 'rgba(15, 8, 8, 0.6)', letterSpacing: 0.8 }]}>
                   ACCOUNT NAME
                 </Text>
-                <Text style={[textStyles.label, { color: '#fff', marginTop: 2 }]}>
+                <Text style={[textStyles.label, { color: '#000', marginTop: 2 }]}>
                   {va.accountName}
                 </Text>
               </View>
@@ -239,6 +262,13 @@ const styles = StyleSheet.create({
   },
 
   loadingWrap: { alignItems: 'center', paddingTop: spacing[16] },
+  noVaWrap:   { alignItems: 'center', paddingTop: spacing[10], paddingHorizontal: spacing[4] },
+  noVaIcon:   { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
+  kycBtn:     {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    borderRadius: radius.xl, paddingVertical: spacing[4], paddingHorizontal: spacing[6],
+    marginTop: spacing[6],
+  },
 
   accountCard: {
     borderRadius:  radius['2xl'],

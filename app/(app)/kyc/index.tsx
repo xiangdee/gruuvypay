@@ -85,10 +85,10 @@ export default function KycIndexScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Current tier banner */}
           <View style={[styles.currentTier, { backgroundColor: theme.brand.primary }]}>
-            <Text style={[textStyles.labelSm, { color: 'rgba(255,255,255,0.7)', letterSpacing: 0.8 }]}>
+            <Text style={[textStyles.labelSm, { color: 'rgba(94, 84, 84, 0.7)', letterSpacing: 0.8 }]}>
               CURRENT TIER
             </Text>
-            <Text style={[textStyles.h2, { color: '#fff', marginTop: spacing[1] }]}>
+            <Text style={[textStyles.h2, { color: '#000', marginTop: spacing[1] }]}>
               {currentTier.replace('_', ' ')}
             </Text>
             {currentTier === 'TIER_3' && (

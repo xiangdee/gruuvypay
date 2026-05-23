@@ -47,6 +47,7 @@ export default function AddPhoneScreen() {
               onChangeText={setPhone}
               autoComplete="tel"
               hint="e.g. 08012345678 or +2348012345678"
+              returnKeyType="done"
             />
           </View>
 

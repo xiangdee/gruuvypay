@@ -8,19 +8,23 @@ import {
   RefreshControl, StyleSheet, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
 import { PortfolioCard } from '@/components/crypto/PortfolioCard';
 import { CoinRow }       from '@/components/crypto/CoinRow';
 import { TransactionSkeleton } from '@/components/home/TransactionSkeleton';
 import { useCryptoLogic, SUPPORTED_COINS } from '@/screens/app/crypto.logic';
+import { useRouter } from 'expo-router';
 
 
 
 export default function CryptoScreen() {
   const { theme } = useTheme();
   const insets    = useSafeAreaInsets();
+  const tabBarH   = useTabBarHeight();
 
+  const router = useRouter();
   const {
     prices, holdings, portfolio,
     refreshing, pricesLoading, hasHoldings,
@@ -38,7 +42,10 @@ export default function CryptoScreen() {
           <Text style={[textStyles.h2, { color: theme.text.primary }]}>
             Crypto
           </Text>
-          <TouchableOpacity style={[styles.historyBtn, { backgroundColor: theme.bg.card }]}>
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/transactions' as any)}
+            style={[styles.historyBtn, { backgroundColor: theme.bg.card }]}
+          >
             <Ionicons name="time-outline" size={18} color={theme.text.secondary} />
             <Text style={[textStyles.labelSm, { color: theme.text.secondary }]}>
               History
@@ -119,7 +126,7 @@ export default function CryptoScreen() {
         renderItem={renderCoin}
         ItemSeparatorComponent={renderSeparator}
         ListHeaderComponent={renderHeader}
-        ListFooterComponent={<View style={{ height: 100 }} />}
+        ListFooterComponent={<View style={{ height: tabBarH + 16 }} />}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

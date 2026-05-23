@@ -1,7 +1,3 @@
-// app/(app)/index.tsx
-// Home screen: wallet header + bills + FULL paginated transaction history
-// Crypto lives entirely on its own tab — zero crypto here
-
 import React from 'react';
 import {
   View, Text, TouchableOpacity,
@@ -9,39 +5,28 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
-import { palette }              from '@/theme/colors';
-import { BalanceCard }          from '@/components/home/BalanceCard';
-import { QuickActionBar }       from '@/components/home/QuickActionBar';
-import { BillsRow }             from '@/components/home/BillsRow';
-import { TransactionItem }      from '@/components/home/TransactionItem';
-import { TransactionSkeleton }  from '@/components/home/TransactionSkeleton';
-import { EmptyTransactions }    from '@/components/home/EmptyTransactions';
-import { useHomeLogic } from '@/screens/app/useHome';
-
-
-// ─── Section header component ─────────────────────────────────────────
-function SectionHeader({ title }: { title: string }) {
-  const { theme } = useTheme();
-  return (
-    <Text style={[
-      textStyles.label,
-      { color: theme.text.muted, marginBottom: spacing[3], marginTop: spacing[1] },
-    ]}>
-      {title}
-    </Text>
-  );
-}
+import { BalanceCard }        from '@/components/home/BalanceCard';
+import { QuickActionBar }     from '@/components/home/QuickActionBar';
+import { BillsRow }           from '@/components/home/BillsRow';
+import { TransactionItem }    from '@/components/home/TransactionItem';
+import { TransactionSkeleton } from '@/components/home/TransactionSkeleton';
+import { EmptyTransactions }  from '@/components/home/EmptyTransactions';
+import { useHomeLogic }       from '@/screens/app/useHome';
+import { useTabBarHeight }    from '@/hooks/useTabBarHeight';
 
 export default function HomeScreen() {
-  const { theme } = useTheme();
+  const { theme }  = useTheme();
+  const tabBarH    = useTabBarHeight();
 
   const {
     user, wallet, refreshing,
     onRefresh, loadMoreTransactions,
     handleToggleBalance,
-    handleTransfer, handleTopUp, handleConvert, handleAnalytics,
-    handleAirtime, handleData, handleBetting, handleAirtimeToCash,
+    handleTransfer, handleTopUp, handleConvert, handleAnalytics,handleGetHelp, handleRewards,
+    handleAirtime, handleData, handleElectricity, handleCable,
+    handleBetting, handleAirtimeToCash,
     handleViewAllBills, handleTransactionPress,
     greeting,
   } = useHomeLogic();
@@ -50,72 +35,129 @@ export default function HomeScreen() {
   const isLoadingFirst  = wallet.txLoading && !hasTransactions;
   const isLoadingMore   = wallet.txLoading && hasTransactions;
 
-  // ─── FlatList data ──────────────────────────────────────────────────
-  // Using FlatList instead of ScrollView for proper virtualization
-  // Header contains the blue section + bills — rendered as ListHeaderComponent
+  const username = user?.username?.replace('@', '') ?? 'there';
+  const initial  = username.slice(0, 1).toUpperCase();
 
   function renderHeader() {
     return (
-      <>
-        {/* Blue wallet section */}
-        <View style={{ backgroundColor: theme.brand.primary }}>
+      <View>
+        {/* ── Top bar ── */}
+        <View style={styles.topBar}>
+          <View style={styles.userRow}>
+            <View style={[
+              styles.avatar,
+              { backgroundColor: theme.bg.card, borderColor: theme.border.DEFAULT },
+            ]}>
+              <Text style={[styles.avatarText, { color: theme.brand.accent }]}>{initial}</Text>
+            </View>
+            <View>
+              <Text style={[textStyles.caption, { color: theme.text.muted }]}>
+                {greeting},
+              </Text>
+              <Text style={[textStyles.label, { color: theme.text.primary }]}>
+                {username}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.topIcons}>
+            <TouchableOpacity
+              style={[
+                styles.iconBtn,
+                { backgroundColor: theme.bg.card, borderColor: theme.border.DEFAULT,
+                  flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+                },
+              ]}
+              onPress={handleGetHelp}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.text.primary} />
+
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.iconBtn,
+                { backgroundColor: theme.bg.card, borderColor: theme.border.DEFAULT,
+                  width: 100,
+                  flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+                },
+              ]}
+              onPress={handleRewards}
+            >
+              <Ionicons name="gift-outline" size={20} color={theme.text.primary} />
+              <Text style={[textStyles.caption, { color: theme.text.primary }]}>Rewards</Text>
+            </TouchableOpacity>
+            
+          </View>
+        </View>
+
+        {/* ── Balance card ── */}
+        <View style={styles.cardWrap}>
           <BalanceCard
             balance={wallet.balance}
             visible={wallet.balanceVisible}
-            loading={wallet.loading}
             onToggle={handleToggleBalance}
-            username={user?.username ?? ''}
-            greeting={greeting}
-          />
-          <QuickActionBar
-            onTransfer={handleTransfer}
-            onTopUp={handleTopUp}
-            onConvert={handleConvert}
-            onAnalytics={handleAnalytics}
+            currency="NGN"
           />
         </View>
 
-        {/* Dark body starts here */}
-        <View style={styles.body}>
+        {/* ── Quick actions ── */}
+        <QuickActionBar
+          onTransfer={handleTransfer}
+          onTopUp={handleTopUp}
+          onConvert={handleConvert}
+          onAnalytics={handleAnalytics}
+        />
+
+        {/* ── Bills ── */}
+        <View style={styles.section}>
           <BillsRow
             onAirtime={handleAirtime}
             onData={handleData}
+            onElectricity={handleElectricity}
+            onCable={handleCable}
             onBetting={handleBetting}
             onAirtimeToCash={handleAirtimeToCash}
             onViewAll={handleViewAllBills}
           />
-
-          {/* Transactions section header */}
-          <View style={[styles.txCard, { backgroundColor: theme.bg.secondary }]}>
-            <SectionHeader title="TRANSACTIONS" />
-
-            {/* Loading skeletons for first load */}
-            {isLoadingFirst && (
-              <>
-                <TransactionSkeleton />
-                <TransactionSkeleton />
-                <TransactionSkeleton />
-                <TransactionSkeleton />
-              </>
-            )}
-
-            {/* Empty state */}
-            {!isLoadingFirst && !hasTransactions && (
-              <EmptyTransactions onFundWallet={handleTopUp} />
-            )}
-          </View>
         </View>
-      </>
+
+        {/* ── Transactions header ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={[textStyles.label, { color: theme.text.primary }]}>Transactions</Text>
+        </View>
+
+        {isLoadingFirst && (
+          <View style={[styles.txContainer, { backgroundColor: theme.bg.secondary }]}>
+            <TransactionSkeleton />
+            <View style={[styles.divider, { backgroundColor: theme.border.DEFAULT }]} />
+            <TransactionSkeleton />
+            <View style={[styles.divider, { backgroundColor: theme.border.DEFAULT }]} />
+            <TransactionSkeleton />
+          </View>
+        )}
+
+        {!isLoadingFirst && !hasTransactions && (
+          <EmptyTransactions onFundWallet={handleTopUp} />
+        )}
+      </View>
     );
   }
 
   function renderTransaction({ item, index }: { item: any; index: number }) {
-    const isLast = index === wallet.transactions.length - 1;
+    const isFirst = index === 0;
+    const isLast  = index === wallet.transactions.length - 1;
+
     return (
       <View style={[
-        styles.txItemWrap,
-        { backgroundColor: theme.bg.secondary },
-        isLast && styles.txItemLast,
+        styles.txItem,
+        {
+          backgroundColor: theme.bg.secondary,
+          borderTopLeftRadius:     isFirst ? radius.xl : 0,
+          borderTopRightRadius:    isFirst ? radius.xl : 0,
+          borderBottomLeftRadius:  isLast  ? radius.xl : 0,
+          borderBottomRightRadius: isLast  ? radius.xl : 0,
+        },
       ]}>
         <TouchableOpacity
           onPress={() => handleTransactionPress(item.id)}
@@ -126,31 +168,26 @@ export default function HomeScreen() {
             amount={item.amount}
             narration={item.narration}
             status={item.status}
-            createdAt={item.createdAt}
+            createdAt={item.created_at}
             metadata={item.metadata}
           />
         </TouchableOpacity>
-        {!isLast && (
-          <View style={[styles.divider, { backgroundColor: theme.border.DEFAULT }]} />
-        )}
+        {!isLast && <View style={[styles.divider, { backgroundColor: theme.border.DEFAULT }]} />}
       </View>
     );
   }
 
   function renderFooter() {
-    if (!isLoadingMore) return <View style={styles.bottomPad} />;
+    if (!isLoadingMore) return <View style={{ height: tabBarH + 16 }} />;
     return (
-      <View style={styles.loadMoreContainer}>
-        <ActivityIndicator size="small" color={theme.brand.primary} />
+      <View style={[styles.loadMore, { paddingBottom: tabBarH }]}>
+        <ActivityIndicator size="small" color={theme.brand.accent} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safe, { backgroundColor: theme.brand.primary }]}
-      edges={['left', 'right']}
-    >
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]} edges={['left', 'right']}>
       <FlatList
         data={hasTransactions ? wallet.transactions : []}
         keyExtractor={(item) => item.id}
@@ -164,12 +201,11 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={palette.white}
-            progressViewOffset={0}
+            tintColor={theme.brand.accent}
           />
         }
-        style={{ backgroundColor: theme.bg.primary }}
-        contentContainerStyle={styles.listContent}
+        style={[styles.list, { backgroundColor: theme.bg.primary }]}
+        contentContainerStyle={{ flexGrow: 1 }}
       />
     </SafeAreaView>
   );
@@ -177,41 +213,78 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  listContent: { flexGrow: 1 },
+  list: { flex: 1 },
 
-  body: {
-    padding:              spacing[4],
-    borderTopLeftRadius:  24,
-    borderTopRightRadius: 24,
-    marginTop:            -24,
+  topBar: {
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+    paddingHorizontal: spacing[5],
+    paddingTop:        spacing[12],
+    paddingBottom:     spacing[3],
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[3],
+  },
+  avatar: {
+    width:        44,
+    height:       44,
+    borderRadius: radius.full,
+    alignItems:   'center',
+    justifyContent: 'center',
+    borderWidth:  1,
+  },
+  avatarText: {
+    fontSize:   18,
+    fontWeight: '800',
+  },
+  topIcons: {
+    flexDirection: 'row',
+    gap:           spacing[2],
+  },
+  iconBtn: {
+    width:          40,
+    height:         40,
+    borderRadius:   radius.full,
+    alignItems:     'center',
+    justifyContent: 'center',
+    borderWidth:    1,
   },
 
-  txCard: {
-    borderRadius:   radius.xl,
-    paddingTop:     spacing[4],
-    paddingBottom:  spacing[2],
+  cardWrap: {
+    paddingHorizontal: spacing[4],
+    marginBottom:      spacing[1],
+  },
+
+  section: {
     paddingHorizontal: spacing[4],
   },
 
-  // Transaction items rendered by FlatList — continuation of txCard
-  txItemWrap: {
-    paddingHorizontal: spacing[4],
-    marginHorizontal:  spacing[4],
+  sectionHeader: {
+    paddingHorizontal: spacing[5],
+    paddingTop:        spacing[4],
+    paddingBottom:     spacing[3],
   },
-  txItemLast: {
-    borderBottomLeftRadius:  radius.xl,
-    borderBottomRightRadius: radius.xl,
-    paddingBottom:           spacing[2],
-    marginBottom:            spacing[4],
+
+  txContainer: {
+    marginHorizontal: spacing[4],
+    borderRadius:     radius.xl,
+    overflow:         'hidden',
+    marginBottom:     spacing[4],
+  },
+  txItem: {
+    marginHorizontal: spacing[4],
+    paddingHorizontal: spacing[4],
   },
   divider: {
-    height: 0.5,
-    marginLeft: spacing[14], // aligns with text, not icon
+    height:     0.5,
+    marginLeft: spacing[14],
   },
-
-  loadMoreContainer: {
+  loadMore: {
     paddingVertical: spacing[4],
-    alignItems: 'center',
+    alignItems:      'center',
   },
-  bottomPad: { height: 100 },
 });
+

@@ -108,15 +108,15 @@ export default function LimitsScreen() {
           activeOpacity={0.85}
         >
           <View style={styles.upgradeContent}>
-            <Ionicons name="arrow-up-circle-outline" size={28} color="#fff" />
+            <Ionicons name="arrow-up-circle-outline" size={28} color="#000" />
             <View style={styles.upgradeText}>
-              <Text style={[textStyles.label, { color: '#fff' }]}>{data.nextLabel}</Text>
-              <Text style={[textStyles.bodySm, { color: 'rgba(255,255,255,0.7)' }]}>
+              <Text style={[textStyles.label, { color: '#000' }]}>{data.nextLabel}</Text>
+              <Text style={[textStyles.bodySm, { color: 'rgba(0, 0, 0, 0.7)' }]}>
                 {data.nextDesc}
               </Text>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+          <Ionicons name="chevron-forward" size={20} color="rgba(0, 0, 0, 0.7)" />
         </TouchableOpacity>
       )}
 

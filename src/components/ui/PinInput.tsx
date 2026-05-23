@@ -12,21 +12,23 @@ import { palette } from '@/theme/colors';
 import { usePinInputLogic } from './PinInput.logic';
 
 interface PinInputProps {
-  onComplete:    (pin: string) => void;
-  error?:        boolean;
-  style?:        ViewStyle;
+  onComplete:     (pin: string) => void;
+  error?:         boolean;
+  style?:         ViewStyle;
+  showBiometrics?: boolean;
+  onBiometrics?:  () => void;
   // expose ref functions via callback ref
-  onRef?:        (api: { shake: () => void; reset: () => void }) => void;
+  onRef?:         (api: { shake: () => void; reset: () => void }) => void;
 }
 
 const NUMPAD = [
   ['1', '2', '3'],
   ['4', '5', '6'],
   ['7', '8', '9'],
-  ['', '0', 'delete'],
+  ['bio', '0', 'delete'],
 ];
 
-export function PinInput({ onComplete, error, style, onRef }: PinInputProps) {
+export function PinInput({ onComplete, error, style, showBiometrics, onBiometrics, onRef }: PinInputProps) {
   const { theme } = useTheme();
   const { pin, activeIndex, shakeAnim, dotAnims, handleKeyPress, reset, shake } =
     usePinInputLogic(onComplete);
@@ -71,14 +73,26 @@ export function PinInput({ onComplete, error, style, onRef }: PinInputProps) {
       <View style={styles.numpad}>
         {NUMPAD.map((row, ri) => (
           <View key={ri} style={styles.numpadRow}>
-            {row.map((key, ki) => (
-              <NumpadKey
-                key={ki}
-                value={key}
-                onPress={() => key && handleKeyPress(key)}
-                theme={theme}
-              />
-            ))}
+            {row.map((key, ki) => {
+              if (key === 'bio') {
+                return (
+                  <NumpadKey
+                    key={ki}
+                    value={showBiometrics ? 'bio' : ''}
+                    onPress={() => showBiometrics && onBiometrics?.()}
+                    theme={theme}
+                  />
+                );
+              }
+              return (
+                <NumpadKey
+                  key={ki}
+                  value={key}
+                  onPress={() => key && handleKeyPress(key)}
+                  theme={theme}
+                />
+              );
+            })}
           </View>
         ))}
       </View>
@@ -101,6 +115,8 @@ function NumpadKey({
     >
       {value === 'delete'
         ? <Ionicons name="backspace-outline" size={24} color={theme.text.primary} />
+        : value === 'bio'
+        ? <Ionicons name="finger-print-outline" size={28} color={theme.text.primary} />
         : <Text style={[textStyles.h3, { color: theme.text.primary }]}>{value}</Text>
       }
     </TouchableOpacity>
@@ -108,15 +124,15 @@ function NumpadKey({
 }
 
 const styles = StyleSheet.create({
-  wrapper:    { alignItems: 'center', gap: spacing[10] },
+  wrapper:    { alignItems: 'center', gap: spacing[5] },
   dotsRow:    {
     flexDirection: 'row',
     gap: spacing[5],
     justifyContent: 'center',
   },
   dot: {
-    width: 52,
-    height: 52,
+    width: 32,
+    height: 32,
     borderRadius: radius.full,
     borderWidth: 2,
   },

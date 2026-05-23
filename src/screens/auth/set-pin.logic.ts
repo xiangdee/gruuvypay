@@ -3,6 +3,7 @@ import { useAppDispatch } from '@/store/hooks';
 import { authApi } from '@/api/auth.api';
 import { setOnboardingStep } from '@/store/slices/auth.slice';
 import { useToast } from '@/hooks/useToast';
+import { secureStorage } from '@/utils/secure-storage';
 
 type Step = 'set' | 'confirm';
 
@@ -34,6 +35,7 @@ export function useSetPinLogic() {
     setLoading(true);
     try {
       await authApi.setPin({ pin, confirmPin: pin });
+      await secureStorage.setPin(pin);
       dispatch(setOnboardingStep('BIOMETRICS'));
       toast.success('PIN set!', 'Almost done');
     } catch (err: any) {

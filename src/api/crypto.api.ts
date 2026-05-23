@@ -1,3 +1,5 @@
+// src/api/crypto.api.ts
+
 import apiClient from './client';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
@@ -40,12 +42,27 @@ export const cryptoApi = {
     symbol:    string;
     amountNgn: number;
     pin:       string;
-    idempotencyKey: string;
+    idempotencyKey?: string;
   }) => {
     const { idempotencyKey, ...body } = params;
+    const key = idempotencyKey ?? `buy-${params.symbol}-${Date.now()}`;
     const { data } = await apiClient.post('/crypto/buy', body, {
-      headers: { 'Idempotency-Key': idempotencyKey },
+      headers: { 'Idempotency-Key': key },
     });
+    return data;
+  },
+
+  sell: async (params: {
+    symbol:       string;
+    cryptoAmount: string;
+    pin:          string;
+  }) => {
+    const { data } = await apiClient.post('/crypto/sell', params);
+    return data;
+  },
+
+  getPortfolio: async () => {
+    const { data } = await apiClient.get('/crypto/portfolio');
     return data;
   },
 

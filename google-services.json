@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:604194047753:android:d5071beb1dcec7e94b75d8",
+        "mobilesdk_app_id": "1:604194047753:android:3afd30b82da139794b75d8",
         "android_client_info": {
-          "package_name": "com.kemeasoude.gruuvypay"
+          "package_name": "com.gruuvy.gruuvypay"
         }
       },
       "oauth_client": [],

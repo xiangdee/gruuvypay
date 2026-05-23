@@ -61,7 +61,7 @@ export const palette = {
     dark: '#1E3A8A',
   },
 
-  white: '#FFFFFF',
+  white: '#ffffff',
   black: '#000000',
   transparent: 'transparent',
 } as const;
@@ -71,7 +71,7 @@ export const palette = {
 export const darkTheme = {
   // Backgrounds
   bg: {
-    primary:   palette.dark[900],    // '#0D0D0D' — main screen bg
+     primary:   palette.dark[900],    // '#0D0D0D' — main screen bg
     secondary: palette.dark[800],    // '#161616' — elevated cards
     card:      palette.dark[700],    // '#232323' — quick action cards
     input:     '#1A1A1A',            // input fields
@@ -89,10 +89,10 @@ export const darkTheme = {
 
   // Brand
   brand: {
-    primary:   palette.blue[500],    // '#1B4FD8'
+    primary:   '#dbd861',    // '#1B4FD8'
     light:     palette.blue[400],
     dark:      palette.blue[700],
-    accent:    palette.teal[500],    // '#1AADA3'
+    accent:    "#C8FF57",    // '#1AADA3'
   },
 
   // Borders
@@ -128,17 +128,17 @@ export const lightTheme = {
     overlay:   'rgba(0,0,0,0.5)',
   },
   text: {
-    primary:   palette.dark[900],
+     primary:   '#b8b63a',
     secondary: palette.dark[500],
     muted:     palette.dark[400],
     inverse:   palette.white,
     link:      palette.blue[500],
   },
   brand: {
-    primary:   palette.blue[500],
+     primary:   '#dbd861',
     light:     palette.blue[400],
     dark:      palette.blue[700],
-    accent:    palette.teal[500],
+    accent:    "#C8FF57",
   },
   border: {
     DEFAULT: 'rgba(0,0,0,0.08)',

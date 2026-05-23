@@ -3,7 +3,7 @@
 
 import React, { useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Animated,
+  View, Text, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/layout/Screen';
@@ -11,6 +11,7 @@ import { KeyboardView } from '@/components/layout/KeyboardView';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PinInput } from '@/components/ui/PinInput';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
 import { useLoginLogic } from '../../src/screens/auth/login.logic';
 
@@ -18,8 +19,9 @@ export default function LoginScreen() {
   const { theme } = useTheme();
   const {
     step, identifier, setIdentifier,
+    identifierError,
     loading, pinError, pinRef,
-    goToPin, goBack, goToSignUp,
+    goToPin, goBack, goToSignUp, goToForgotPin,
     onPinComplete, tryBiometricLogin,
   } = useLoginLogic();
 
@@ -29,6 +31,7 @@ export default function LoginScreen() {
   if (step === 'pin') {
     return (
       <Screen padded>
+        <LoadingOverlay visible={loading} message="Signing in..." />
         <TouchableOpacity onPress={goBack} style={styles.back}>
           <Ionicons name="arrow-back" size={24} color={theme.text.primary} />
         </TouchableOpacity>
@@ -51,9 +54,11 @@ export default function LoginScreen() {
           error={pinError}
           onRef={(api) => { pinRef.current = api; }}
           style={styles.pin}
+          showBiometrics
+          onBiometrics={tryBiometricLogin}
         />
 
-        <TouchableOpacity style={styles.forgotPin}>
+        <TouchableOpacity style={styles.forgotPin} onPress={goToForgotPin}>
           <Text style={[textStyles.bodySm, { color: theme.text.link }]}>
             Forgot PIN?
           </Text>

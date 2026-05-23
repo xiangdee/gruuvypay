@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useToast } from '@/hooks/useToast';
+import { cryptoApi } from '@/api/crypto.api';
+
+const NGN_PER_USD = 1615;
 
 // Supported coins on GruuvyPay
 export const SUPPORTED_COINS = [
@@ -47,17 +50,20 @@ export function useCryptoLogic() {
   async function loadPrices() {
     setPricesLoading(true);
     try {
-      // TODO: call CoinGecko or Tatum price API
-      // Placeholder prices for now
-      const mockPrices: Record<string, CoinPrice> = {
-        BTC:  { symbol: 'BTC',  priceNGN: '₦158,400,000', priceUSD: '$98,200',  change24h: 2.4,  loading: false },
-        ETH:  { symbol: 'ETH',  priceNGN: '₦5,490,000',   priceUSD: '$3,405',   change24h: 1.8,  loading: false },
-        USDT: { symbol: 'USDT', priceNGN: '₦1,614',        priceUSD: '$1.00',    change24h: 0.01, loading: false },
-        SOL:  { symbol: 'SOL',  priceNGN: '₦243,000',      priceUSD: '$150.60',  change24h: -1.2, loading: false },
-        LTC:  { symbol: 'LTC',  priceNGN: '₦138,000',      priceUSD: '$85.50',   change24h: 0.7,  loading: false },
-        XRP:  { symbol: 'XRP',  priceNGN: '₦3,390',        priceUSD: '$2.10',    change24h: 3.1,  loading: false },
-      };
-      setPrices(mockPrices);
+      const raw = await cryptoApi.getAllPrices();
+      const formatted: Record<string, CoinPrice> = {};
+      for (const [symbol, p] of Object.entries(raw) as [string, any][]) {
+        const usd = p.priceUSD as number;
+        const ngn = usd * NGN_PER_USD;
+        formatted[symbol] = {
+          symbol:    symbol as any,
+          priceUSD:  `$${usd.toLocaleString('en-US', { maximumFractionDigits: usd < 1 ? 4 : 2 })}`,
+          priceNGN:  `₦${ngn.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
+          change24h: p.change24h ?? 0,
+          loading:   false,
+        };
+      }
+      setPrices(formatted);
     } catch (err: any) {
       toast.error('Prices unavailable', 'Could not load crypto prices');
     } finally {

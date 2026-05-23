@@ -3,11 +3,13 @@
 import React from 'react';
 import {
   Animated, TouchableOpacity, Text,
-  ActivityIndicator, StyleSheet, ViewStyle, TextStyle,
+  StyleSheet, ViewStyle, TextStyle,
+  View,
 } from 'react-native';
 import { useTheme } from '@/theme';
 import { textStyles, layout, radius, spacing } from '@/theme';
 import { useButtonLogic } from './Button.logic';
+import { Spinner } from './Spinner';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize    = 'sm' | 'md' | 'lg';
@@ -50,6 +52,7 @@ export function Button({
     textStyle,
   ].filter(Boolean) as TextStyle[];
 
+
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
@@ -62,15 +65,16 @@ export function Button({
         accessibilityRole="button"
         accessibilityLabel={label}
       >
-        {loading
-          ? <ActivityIndicator color={labelColor(variant, theme)} size="small" />
-          : (
-            <>
-              {leftIcon}
-              <Text style={labelStyles}>{label}</Text>
-            </>
-          )
-        }
+        {loading ? (
+    <Spinner color={labelColor(variant, theme)} size="small" />
+  ) : (
+    <>
+      {leftIcon && (
+        <View style={styles.leftIcon}>{leftIcon}</View>
+      )}
+      <Text style={[...labelStyles, { flex: 1, textAlign: 'center' }]}>{label}</Text>
+    </>
+  )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -101,7 +105,7 @@ function labelColor(variant: ButtonVariant, theme: any): string {
   switch (variant) {
     case 'secondary': return theme.brand.primary;
     case 'ghost':     return theme.text.primary;
-    default:          return '#FFFFFF';
+    default:          return '#000';
   }
 }
 
@@ -112,10 +116,15 @@ const sizeStyles: Record<ButtonSize, ViewStyle> = {
 };
 
 const styles = StyleSheet.create({
+   leftIcon: {
+    position: 'absolute',
+    left: spacing[5],
+  },
   base: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    textAlign: 'center',
     gap: spacing[2],
   },
   fullWidth: { width: '100%' },

@@ -22,7 +22,7 @@ export function PortfolioCard({
   return (
     <View style={[styles.card, { backgroundColor: theme.brand.primary }]}>
       {/* Portfolio label */}
-      <Text style={[textStyles.labelSm, { color: 'rgba(255,255,255,0.6)', letterSpacing: 1 }]}>
+      <Text style={[textStyles.labelSm, { color:  palette.black, letterSpacing: 1 }]}>
         CRYPTO PORTFOLIO
       </Text>
 
@@ -30,7 +30,7 @@ export function PortfolioCard({
       <Text style={[textStyles.display, { color: palette.white, marginVertical: spacing[2] }]}>
         {totalNGN}
       </Text>
-      <Text style={[textStyles.body, { color: 'rgba(255,255,255,0.6)' }]}>
+      <Text style={[textStyles.body, { color: '#000' }]}>
         ≈ {totalUSD}
       </Text>
 
@@ -50,9 +50,9 @@ function ActionBtn({
   return (
     <TouchableOpacity onPress={onPress} style={styles.actionBtn} activeOpacity={0.7}>
       <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-        <Ionicons name={icon} size={20} color={palette.white} />
+        <Ionicons name={icon} size={20} color={palette.black} />
       </View>
-      <Text style={[textStyles.caption, { color: palette.white, marginTop: spacing[1] }]}>
+      <Text style={[textStyles.caption, { color: palette.black, marginTop: spacing[1] }]}>
         {label}
       </Text>
     </TouchableOpacity>

@@ -7,22 +7,38 @@ export interface KycStatus {
   addressVerified: boolean;
   utilityVerified: boolean;
   rejectionReason: string | null;
+  legalName:       string | null;
 }
 
 export const kycApi = {
+
   getStatus: async (): Promise<KycStatus> => {
     const { data } = await apiClient.get('/kyc/status');
     return data;
   },
 
-  verifyBvn: async (payload: {
-    bvn:         string;
-    dateOfBirth: string;  // YYYY-MM-DD
-  }): Promise<{ success: boolean; message: string; tier: string; name?: string }> => {
-    const { data } = await apiClient.post('/kyc/bvn', payload);
+  // ── BVN — Step 1: Initiate consent (returns NIBSS consent URL) ──────────
+  initiateBvn: async (bvn: string): Promise<{
+    success:    boolean;
+    reference:  string;
+    consentUrl: string | null;  // null if consent already given before
+    message:    string;
+  }> => {
+    const { data } = await apiClient.post('/kyc/bvn/initiate', { bvn });
     return data;
   },
 
+  // ── BVN — Step 2: Poll status after user returns from consent page ──────
+  checkBvnStatus: async (): Promise<{
+    status:  'verified' | 'pending';
+    tier?:   string;
+    message?: string;
+  }> => {
+    const { data } = await apiClient.get('/kyc/bvn/status');
+    return data;
+  },
+
+  // ── NIN + Utility bill ───────────────────────────────────────────────────
   submitNin: async (payload: {
     nin:            string;
     utilityBillUrl: string;
@@ -32,6 +48,7 @@ export const kycApi = {
     return data;
   },
 
+  // ── Address verification ─────────────────────────────────────────────────
   submitAddress: async (payload: {
     address:          string;
     city:             string;
@@ -43,8 +60,7 @@ export const kycApi = {
     return data;
   },
 
-  // Upload document to backend (which stores to S3/Cloudinary)
-  // Returns the public URL to use in BVN/NIN/address submissions
+  // ── Upload document ──────────────────────────────────────────────────────
   uploadDocument: async (uri: string, type: string): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append('file', {

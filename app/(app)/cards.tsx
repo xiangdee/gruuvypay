@@ -9,6 +9,7 @@ import {
 import { SafeAreaView }  from "react-native-safe-area-context";
 import { Ionicons }      from "@expo/vector-icons";
 import { useTheme, textStyles, spacing, radius } from "@/theme";
+import { useTabBarHeight } from "@/hooks/useTabBarHeight";
 
 const { width } = Dimensions.get("window");
 const CARD_W    = width - spacing[8];
@@ -22,12 +23,13 @@ const FEATURES = [
 
 export default function CardsScreen() {
   const { theme } = useTheme();
+  const tabBarH   = useTabBarHeight();
   const [active, setActive] = useState<"ngn" | "usd">("ngn");
   const isNgn = active === "ngn";
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarH + spacing[4] }]} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
           <Text style={[textStyles.h2, { color: theme.text.primary }]}>Virtual Cards</Text>
@@ -56,13 +58,13 @@ export default function CardsScreen() {
           <View style={[styles.circle1, { backgroundColor: isNgn ? "rgba(255,255,255,0.08)" : "rgba(124,58,237,0.15)" }]} />
           <View style={[styles.circle2, { backgroundColor: isNgn ? "rgba(255,255,255,0.05)" : "rgba(124,58,237,0.08)" }]} />
           <View style={[styles.badge, { backgroundColor: isNgn ? "rgba(255,255,255,0.15)" : "rgba(124,58,237,0.35)" }]}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>{isNgn ? "\u20A6 NGN" : "$ USD"}</Text>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>{isNgn ? `\u20A6 NGN` : "$ USD"}</Text>
           </View>
           <View style={styles.chip}>
             <View style={styles.chipLine} />
             <View style={[styles.chipLine, { marginTop: 5 }]} />
           </View>
-          <Text style={styles.cardNum}>\u2022\u2022\u2022\u2022  \u2022\u2022\u2022\u2022  \u2022\u2022\u2022\u2022  \u2022\u2022\u2022\u2022</Text>
+          <Text style={styles.cardNum}>{'\u2022'}{'\u2022'}{'\u2022'}{'\u2022'}  {'\u2022'}{'\u2022'}{'\u2022'}{'\u2022'}  {'\u2022'}{'\u2022'}{'\u2022'}{'\u2022'}  {'\u2022'}{'\u2022'}{'\u2022'}{'\u2022'}</Text>
           <View style={styles.cardBottom}>
             <View>
               <Text style={styles.cardLbl}>CARD HOLDER</Text>
@@ -70,7 +72,7 @@ export default function CardsScreen() {
             </View>
             <View style={{ alignItems: "flex-end" }}>
               <Text style={styles.cardLbl}>EXPIRES</Text>
-              <Text style={styles.cardVal}>\u2022\u2022/\u2022\u2022</Text>
+              <Text style={styles.cardVal}>{'\u2022'}{'\u2022'}/{'\u2022'}{'\u2022'}</Text>
             </View>
           </View>
         </View>

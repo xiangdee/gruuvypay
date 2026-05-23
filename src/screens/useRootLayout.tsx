@@ -1,7 +1,8 @@
 // All boot logic and route guard for the root layout.
 // Lives in src/screens/ not app/ — Expo Router ignores this folder.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import {
@@ -13,11 +14,12 @@ import {
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { silentRefresh }   from '@/store/slices/auth.slice';
+import { fetchUser, silentRefresh }   from '@/store/slices/auth.slice';
 
-import { resetDailySpend } from '@/store/slices/wallet.slice';
+import { fetchBalance, resetDailySpend } from '@/store/slices/wallet.slice';
 import { initDeviceUA }    from '@/utils/device';
 import { fetchRates } from '@/store/slices/currency.slice';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -26,8 +28,12 @@ export function useRootLayout() {
   const router   = useRouter();
   const segments = useSegments();
 
-  const [appReady, setAppReady] = useState(false);
+  const [appReady,  setAppReady]  = useState(false);
+  const [isLocked,  setIsLocked]  = useState(false);
   const { isAuthenticated, onboardingStep } = useAppSelector((s) => s.auth);
+
+  // Register / re-register push token whenever auth state becomes complete
+  usePushNotifications();
 
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -43,6 +49,7 @@ export function useRootLayout() {
       try {
         await initDeviceUA();            // build X-Device-UA header once
         await dispatch(silentRefresh()); // restore session from SecureStore
+        await dispatch(fetchUser());    // fetch user
         dispatch(fetchRates());          // exchange rates — non-blocking
       } catch {
         // No session — falls through to auth screens via route guard
@@ -62,6 +69,48 @@ export function useRootLayout() {
     }, msUntilMidnight);
     return () => clearTimeout(timer);
   }, []);
+
+  // ── Background-aware polling + app lock ──────────────────────────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const LOCK_GRACE_MS = 300_000; // only lock if backgrounded for > 5 min
+    const appStateRef    = { current: AppState.currentState };
+    const backgroundedAt = { current: 0 };
+    let balanceTimer: ReturnType<typeof setInterval>;
+    let ratesTimer:   ReturnType<typeof setInterval>;
+
+    function startPolling() {
+      balanceTimer = setInterval(() => dispatch(fetchBalance()),  30_000);
+      ratesTimer   = setInterval(() => dispatch(fetchRates()),   300_000);
+    }
+
+    function stopPolling() {
+      clearInterval(balanceTimer);
+      clearInterval(ratesTimer);
+    }
+
+    startPolling();
+
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appStateRef.current !== 'active' && next === 'active') {
+        // Only lock if the app was in the background long enough
+        if (backgroundedAt.current && Date.now() - backgroundedAt.current > LOCK_GRACE_MS) {
+          setIsLocked(true);
+        }
+        backgroundedAt.current = 0;
+        dispatch(fetchBalance());
+        dispatch(fetchRates());
+        startPolling();
+      } else if (next === 'background' || next === 'inactive') {
+        backgroundedAt.current = Date.now();
+        stopPolling();
+      }
+      appStateRef.current = next;
+    });
+
+    return () => { stopPolling(); sub.remove(); };
+  }, [isAuthenticated]);
 
   // ── Route guard ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -83,8 +132,18 @@ export function useRootLayout() {
         PIN:        '/(auth)/set-pin',
         BIOMETRICS: '/(auth)/biometrics',
       };
-      const target = stepRoutes[onboardingStep];
-      if (target) router.replace(target as any);
+      // Don't redirect if already on a screen that's part of this step's flow
+      const stepScreens: Record<string, string[]> = {
+        PHONE:      ['add-phone', 'verify-phone'],
+        PIN:        ['set-pin'],
+        BIOMETRICS: ['biometrics'],
+      };
+      const currentScreen = segments[1] as string | undefined;
+      const validScreens  = stepScreens[onboardingStep] ?? [];
+      if (!validScreens.includes(currentScreen ?? '')) {
+        const target = stepRoutes[onboardingStep];
+        if (target) router.replace(target as any);
+      }
       return;
     }
 
@@ -94,5 +153,9 @@ export function useRootLayout() {
     }
   }, [appReady, isAuthenticated, onboardingStep, segments]);
 
-  return { appReady, fontsLoaded };
+  function onUnlocked() {
+    setIsLocked(false);
+  }
+
+  return { appReady, fontsLoaded, isLocked, onUnlocked };
 }

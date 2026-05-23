@@ -5,12 +5,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
 import { useProfile } from '@/screens/app/useProfile';
 
 export default function ProfileScreen() {
   const { theme }  = useTheme();
   const insets     = useSafeAreaInsets();
+  const tabBarH    = useTabBarHeight();
   const { user, tierInfo, navItems, navigate, handleLogout } = useProfile();
 
   const initials = (user?.firstName?.[0] ?? '') + (user?.lastName?.[0] ?? '');
@@ -18,7 +20,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.scroll, { backgroundColor: theme.bg.primary }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing[4] }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing[4], paddingBottom: tabBarH + spacing[4] }]}
       showsVerticalScrollIndicator={false}
     >
       <Text style={[textStyles.h2, { color: theme.text.primary, marginBottom: spacing[6] }]}>

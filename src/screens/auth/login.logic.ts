@@ -55,13 +55,12 @@ export function useLoginLogic() {
 
     const result = await dispatch(login({
       identifier: identifier.trim().toLowerCase(),
-      pin,
-      deviceName: 'Mobile',
+      pin
     }));
 
     if (login.fulfilled.match(result)) {
-      // 2FA check
       const payload = result.payload as any;
+
       if (payload?.type === 'twoFa') {
         router.push({
           pathname: '/(auth)/two-fa',
@@ -73,6 +72,13 @@ export function useLoginLogic() {
         });
         return;
       }
+
+      if (payload?.type === 'incomplete') {
+        toast.info('Account setup incomplete', 'Resuming your setup from where you left off.');
+        // isAuthenticated + onboardingStep are now set in Redux — route guard navigates automatically
+        return;
+      }
+
       // Success — route guard handles navigation
     } else {
       setPinError(true);
@@ -99,6 +105,10 @@ export function useLoginLogic() {
     router.push('/(auth)/sign-up');
   }
 
+  function goToForgotPin() {
+    router.push('/(auth)/forgot-pin');
+  }
+
   function goBack() {
     if (step === 'pin') setStep('identifier');
     else router.back();
@@ -109,7 +119,7 @@ export function useLoginLogic() {
     setIdentifier: handleIdentifierChange,
     identifierError,
     loading, pinError, pinRef,
-    goToPin, goBack, goToSignUp,
+    goToPin, goBack, goToSignUp, goToForgotPin,
     onPinComplete, tryBiometricLogin,
   };
 }

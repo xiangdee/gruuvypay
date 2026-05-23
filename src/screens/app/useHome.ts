@@ -22,6 +22,7 @@ export function useHomeLogic() {
   // Initial load
   useEffect(() => {
     dispatch(fetchBalance());
+    setInterval(() => dispatch(fetchBalance()), 30000);
     dispatch(fetchTransactions({ page: 1 }));
     dispatch(fetchVirtualAccount());
   }, []);
@@ -54,8 +55,12 @@ export function useHomeLogic() {
   function handleTopUp()           { router.push('/(app)/top-up');                 }
   function handleConvert()         { router.push('/(app)/convert');                }
   function handleAnalytics()       { router.push('/(app)/analytics');              }
+  function handleRewards()         { router.push('/(app)/rewards');                }
+  function handleGetHelp()         { router.push('/(app)/profile/help');                   }
   function handleAirtime()         { router.push('/(app)/bills/airtime');          }
   function handleData()            { router.push('/(app)/bills/data');             }
+  function handleElectricity()     { router.push('/(app)/bills/electricity');      }
+  function handleCable()           { router.push('/(app)/bills/cable');            }
   function handleBetting()         { router.push('/(app)/bills/betting');          }
   function handleAirtimeToCash()   { router.push('/(app)/bills/airtime-to-cash'); }
   function handleViewAllBills()    { router.push('/(app)/bills');                  }
@@ -81,8 +86,12 @@ export function useHomeLogic() {
     handleTopUp,
     handleConvert,
     handleAnalytics,
+    handleRewards,
+    handleGetHelp,
     handleAirtime,
     handleData,
+    handleElectricity,
+    handleCable,
     handleBetting,
     handleAirtimeToCash,
     handleViewAllBills,

@@ -64,6 +64,7 @@ export function OtpInput({ onComplete, error, style, onRef }: OtpInputProps) {
                 fontWeight:  '600',
               },
             ]}
+            returnKeyType={'done'}
           />
         );
       })}

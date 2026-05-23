@@ -9,13 +9,11 @@ import { authApi } from '@/api/auth.api';
 import { useToast } from '@/hooks/useToast';
 
 interface Session {
-  id:          number;
-  deviceName:  string;
-  deviceModel: string;
-  deviceOs:    string;
-  lastIp:      string;
-  lastActive:  string;
-  startedAt:   string;
+  id:           number;
+  deviceName:   string;  // "iPhone 15 Pro (iOS)"
+  lastIp:       string;
+  lastActivity: string;  // API field
+  createdAt:    string;
 }
 
 export default function SessionsScreen() {
@@ -31,9 +29,16 @@ export default function SessionsScreen() {
   async function loadSessions() {
     setLoading(true);
     try {
-      const data = await authApi.getMe(); // getMe includes sessions
-      // TODO: replace with dedicated /auth/sessions endpoint
-      setSessions([]);
+      const data = await authApi.getSessions();
+      // Backend may return: Session[] directly, or { sessions: Session[] }, or { data: Session[] }
+      const list: Session[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.sessions)
+        ? data.sessions
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+      setSessions(list);
     } catch {
       toast.error('Failed to load sessions');
     } finally {
@@ -52,7 +57,7 @@ export default function SessionsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: call /auth/sessions/:id DELETE
+              await authApi.revokeSession(String(session.id));
               setSessions((prev) => prev.filter((s) => s.id !== session.id));
               toast.success('Session revoked');
             } catch {
@@ -64,9 +69,10 @@ export default function SessionsScreen() {
     );
   }
 
-  function osIcon(os: string): string {
-    if (os?.toLowerCase().includes('ios') || os?.toLowerCase().includes('ipad')) return 'logo-apple';
-    if (os?.toLowerCase().includes('android')) return 'logo-android';
+  function osIcon(deviceName: string): string {
+    const n = deviceName?.toLowerCase() ?? '';
+    if (n.includes('ios') || n.includes('iphone') || n.includes('ipad')) return 'logo-apple';
+    if (n.includes('android')) return 'logo-android';
     return 'phone-portrait-outline';
   }
 
@@ -93,14 +99,14 @@ export default function SessionsScreen() {
             <React.Fragment key={session.id}>
               <View style={styles.sessionRow}>
                 <View style={[styles.deviceIcon, { backgroundColor: theme.bg.card }]}>
-                  <Ionicons name={osIcon(session.deviceOs) as any} size={22} color={theme.text.secondary} />
+                  <Ionicons name={osIcon(session.deviceName) as any} size={22} color={theme.text.secondary} />
                 </View>
                 <View style={styles.sessionInfo}>
                   <Text style={[textStyles.label, { color: theme.text.primary }]}>
                     {session.deviceName}
                   </Text>
                   <Text style={[textStyles.caption, { color: theme.text.muted }]}>
-                    {session.lastIp} · Last active {new Date(session.lastActive).toLocaleDateString()}
+                    {session.lastIp} · Last active {new Date(session.lastActivity).toLocaleDateString()}
                   </Text>
                 </View>
                 <TouchableOpacity

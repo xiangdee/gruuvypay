@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 const KEYS = {
   REFRESH_TOKEN: 'gruuvy_rt',
   BIOMETRIC_ENABLED: 'gruuvy_bio',
+  PIN: 'gruuvy_pin',
 } as const;
 
 export const secureStorage = {
@@ -26,6 +27,11 @@ export const secureStorage = {
     const val = await SecureStore.getItemAsync(KEYS.BIOMETRIC_ENABLED);
     return val === '1';
   },
+
+  // PIN (stored so biometrics can retrieve and submit it)
+  setPin: (pin: string) => SecureStore.setItemAsync(KEYS.PIN, pin),
+  getPin: () => SecureStore.getItemAsync(KEYS.PIN),
+  deletePin: () => SecureStore.deleteItemAsync(KEYS.PIN),
 
   // Clear everything on logout
   clearAll: async () => {
