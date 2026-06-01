@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+﻿import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image, ScrollView,
+  ActivityIndicator, Image, ScrollView, Modal,
 } from 'react-native';
 import { useRouter }  from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,8 +20,11 @@ import { useToast }   from '@/hooks/useToast';
 import { useAppDispatch } from '@/store/hooks';
 import { fetchBalance, fetchTransactions } from '@/store/slices/wallet.slice';
 import { nanoid }     from 'nanoid/non-secure';
+import { recentCache, CableBeneficiary } from '@/services/recentCache';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
+import { SaveBeneficiaryModal } from '@/components/ui/SaveBeneficiaryModal';
 
-type Step = 'provider' | 'details' | 'verify' | 'pin' | 'success';
+type Step = 'provider' | 'plan' | 'details' | 'verify' | 'pin' | 'success';
 
 type CableProvider = {
   id: string;
@@ -62,6 +65,17 @@ export default function CableScreen() {
   const [loading,   setLoading]   = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error,     setError]     = useState('');
+
+  // â”€â”€ Beneficiaries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [beneficiaries, setBeneficiaries] = useState<CableBeneficiary[]>([]);
+  const [showBeneficiaries, setShowBeneficiaries] = useState(false);
+  const { beneficiaries: savedBeneficiaries, add: saveBeneficiary, remove: removeBeneficiary } = useBeneficiaries('cable');
+  const [savingId, setSavingId]       = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ item: CableBeneficiary; key: string } | null>(null);
+
+  useEffect(() => {
+    recentCache.getCableBeneficiaries().then(setBeneficiaries);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,13 +129,15 @@ export default function CableScreen() {
         biller_code: provider!.biller_code,
         customer_id: smartcard,
       });
+
+      console.log(res)
       const customerData = res?.name ? res : res?.data ?? res;
       setCustomer(customerData);
       setStep('verify');
       toast.success('Smartcard verified');
     } catch (err: any) {
       setCustomer(null);
-      setError(err?.response?.data?.message ?? 'Could not verify smartcard');
+      setError(err?.message ?? 'Could not verify smartcard');
     } finally {
       setVerifying(false);
     }
@@ -144,9 +160,19 @@ export default function CableScreen() {
       });
       dispatch(fetchBalance());
       dispatch(fetchTransactions({ page: 1 }));
+      // Save beneficiary
+      await recentCache.addCableBeneficiary({
+        smartcard,
+        customerName: customer?.name ?? customer?.Customer_Name ?? customer?.customer_name ?? smartcard,
+        providerId:   provider!.id,
+        providerName: provider!.shortName,
+        providerLogo: provider!.logo_url,
+      });
+      const fresh = await recentCache.getCableBeneficiaries();
+      setBeneficiaries(fresh);
       setStep('success');
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Payment failed';
+      const msg = err?.message ?? 'Payment failed';
       setPinError(true); pinRef.current?.shake(); setError(msg);
     } finally {
       setLoading(false);
@@ -155,7 +181,8 @@ export default function CableScreen() {
 
   function goBack() {
     setError('');
-    if      (step === 'details') setStep('provider');
+    if      (step === 'plan')    setStep('provider');
+    else if (step === 'details') setStep('plan');
     else if (step === 'verify')  setStep('details');
     else if (step === 'pin')     setStep('verify');
     else router.back();
@@ -163,6 +190,7 @@ export default function CableScreen() {
 
   const stepTitle: Record<Step, string> = {
     provider: 'Cable TV',
+    plan:     'Select Plan',
     details:  'Subscription Details',
     verify:   'Confirm Details',
     pin:      'Enter PIN',
@@ -171,7 +199,7 @@ export default function CableScreen() {
 
   const planAmount = parseFloat(plan?.amount ?? '0');
 
-  // ── Success ──────────────────────────────────────────────────────────
+  // â”€â”€ Success â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'success') return (
     <Screen padded scrollable>
       <View style={styles.center}>
@@ -188,10 +216,45 @@ export default function CableScreen() {
           style={{ marginTop: spacing[8], width: '100%' }}
         />
       </View>
+
+      {!savedBeneficiaries.some((b) => b.details.smartcard === smartcard && b.details.providerId === provider?.id) && (
+        <TouchableOpacity
+          onPress={() => setPendingSave({
+            item: {
+              smartcard,
+              customerName: customer?.name ?? customer?.Customer_Name ?? customer?.customer_name ?? smartcard,
+              providerId:   provider!.id,
+              providerName: provider!.shortName,
+              providerLogo: provider!.logo_url,
+            },
+            key: smartcard + provider?.id,
+          })}
+          style={[styles.saveBeneficiaryCard, { backgroundColor: theme.bg.secondary, borderColor: theme.border.DEFAULT }]}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="star-outline" size={20} color={theme.brand.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[textStyles.label, { color: theme.text.primary }]}>Save to beneficiaries</Text>
+            <Text style={[textStyles.caption, { color: theme.text.muted }]}>Quickly access this smartcard next time</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
+        </TouchableOpacity>
+      )}
+
+      <SaveBeneficiaryModal
+        visible={!!pendingSave}
+        defaultAlias={pendingSave?.item.customerName ?? pendingSave?.item.smartcard ?? ''}
+        onCancel={() => setPendingSave(null)}
+        onSave={async (alias) => {
+          if (!pendingSave) return;
+          await saveBeneficiary({ type: 'cable', label: pendingSave.item.smartcard, details: { ...pendingSave.item, alias } });
+          setPendingSave(null);
+        }}
+      />
     </Screen>
   );
 
-  // ── PIN ──────────────────────────────────────────────────────────────
+  // â”€â”€ PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'pin') return (
     <Screen padded>
       <LoadingOverlay visible={loading} message="Processing..." />
@@ -217,7 +280,7 @@ export default function CableScreen() {
     </Screen>
   );
 
-  // ── Provider / Details / Verify ───────────────────────────────────────
+  // â”€â”€ Provider / Details / Verify â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <Screen padded scrollable>
       <TouchableOpacity onPress={goBack} style={styles.back}>
@@ -229,7 +292,7 @@ export default function CableScreen() {
 
       <BalanceBanner />
 
-      {/* ── Step 1: Select provider ── */}
+      {/* â”€â”€ Step 1: Select provider â”€â”€ */}
       {step === 'provider' && (
         <>
           <Text style={[textStyles.labelSm, { color: theme.text.muted, marginTop: spacing[4], marginBottom: spacing[3] }]}>
@@ -257,11 +320,7 @@ export default function CableScreen() {
                       },
                     ]}
                   >
-                    <Image
-                      source={{ uri: p.logo_url }}
-                      style={styles.providerLogo}
-                      resizeMode="contain"
-                    />
+                    <Image source={{ uri: p.logo_url }} style={styles.providerLogo} resizeMode="contain" />
                     <Text
                       numberOfLines={1}
                       style={[textStyles.labelSm, { marginTop: spacing[2], color: active ? '#fff' : theme.text.primary }]}
@@ -277,14 +336,14 @@ export default function CableScreen() {
           <Button
             label="Continue"
             disabled={!provider}
-            onPress={() => setStep('details')}
+            onPress={() => setStep('plan')}
             style={{ marginTop: spacing[6] }}
           />
         </>
       )}
 
-      {/* ── Step 2: Plan + smartcard + phone ── */}
-      {step === 'details' && (
+      {/* â”€â”€ Step 2: Select plan â”€â”€ */}
+      {step === 'plan' && (
         <>
           {provider && (
             <TouchableOpacity
@@ -298,54 +357,72 @@ export default function CableScreen() {
             </TouchableOpacity>
           )}
 
-          <Text style={[textStyles.labelSm, { color: theme.text.muted, marginTop: spacing[5], marginBottom: spacing[3] }]}>
-            SELECT PLAN
-          </Text>
-
           {plansLoading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color={theme.brand.primary} />
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-             style={{ marginBottom: spacing[2], height: 150 }}
-            contentContainerStyle={{ height: 150, gap: spacing[3] }}
+            <View style={styles.plansGrid}>
+              {plans.map((p) => {
+                const active = plan?.item_code === p.item_code;
+                return (
+                  <TouchableOpacity
+                    key={p.item_code}
+                    onPress={() => setPlan(p)}
+                    activeOpacity={0.85}
+                    style={[
+                      styles.planCard,
+                      {
+                        backgroundColor: active ? theme.brand.primary : theme.bg.secondary,
+                        borderColor:     active ? theme.brand.primary : theme.border.DEFAULT,
+                      },
+                    ]}
+                  >
+                    <Text numberOfLines={2} style={[textStyles.label, { color: active ? '#000' : theme.text.primary }]}>
+                      {p.name}
+                    </Text>
+                    <Text style={[textStyles.bodySm, {
+                      color: active ? 'rgba(21, 13, 13, 0.9)' : theme.brand.primary,
+                      fontWeight: '700', marginTop: spacing[1],
+                    }]}>
+                      ₦{parseFloat(p.amount).toLocaleString()}
+                    </Text>
+                    {p.duration ? (
+                      <Text style={[textStyles.caption, { color: active ? 'rgba(255,255,255,0.7)' : theme.text.muted }]}>
+                        {p.duration}
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          <Button
+            label="Continue"
+            disabled={!plan}
+            onPress={() => setStep('details')}
+            style={{ marginTop: spacing[6] }}
+          />
+        </>
+      )}
+
+      {/* â”€â”€ Step 3: Smartcard + phone â”€â”€ */}
+      {step === 'details' && (
+        <>
+          {provider && plan && (
+            <TouchableOpacity
+              onPress={() => setStep('plan')}
+              style={[styles.providerChip, { backgroundColor: theme.bg.secondary, borderColor: theme.border.DEFAULT }]}
+              activeOpacity={0.8}
             >
-              <View style={{ flexDirection: 'row', gap: spacing[3], paddingBottom: spacing[1] }}>
-                {plans.map((p) => {
-                  const active = plan?.item_code === p.item_code;
-                  return (
-                    <TouchableOpacity
-                      key={p.item_code}
-                      onPress={() => setPlan(p)}
-                      activeOpacity={0.85}
-                      style={[
-                        styles.planCard,
-                        {
-                          backgroundColor: active ? theme.brand.primary : theme.bg.secondary,
-                          borderColor:     active ? theme.brand.primary : theme.border.DEFAULT,
-                        },
-                      ]}
-                    >
-                      <Text numberOfLines={2} style={[textStyles.label, { color: active ? '#fff' : theme.text.primary }]}>
-                        {p.name}
-                      </Text>
-                      <Text style={[textStyles.bodySm, {
-                        color: active ? 'rgba(255,255,255,0.9)' : theme.brand.primary,
-                        fontWeight: '700', marginTop: spacing[1],
-                      }]}>
-                        ₦{parseFloat(p.amount).toLocaleString()}
-                      </Text>
-                      {p.duration ? (
-                        <Text style={[textStyles.caption, { color: active ? 'rgba(255,255,255,0.7)' : theme.text.muted }]}>
-                          {p.duration}
-                        </Text>
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
+              <Image source={{ uri: provider.logo_url }} style={styles.chipLogo} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={[textStyles.label, { color: theme.text.primary }]}>{plan.name}</Text>
+                <Text style={[textStyles.caption, { color: theme.text.muted }]}>{provider.shortName} · ₦{parseFloat(plan.amount).toLocaleString()}</Text>
               </View>
-            </ScrollView>
+              <Text style={[textStyles.caption, { color: theme.brand.primary }]}>Change</Text>
+            </TouchableOpacity>
           )}
 
           <Input
@@ -354,8 +431,12 @@ export default function CableScreen() {
             onChangeText={(t) => { setSmartcard(t); setCustomer(null); }}
             keyboardType="numeric"
             placeholder="Enter smartcard number"
-            style={{ marginTop: spacing[3] }}
+            containerStyle={{ marginTop: spacing[4] }}
           />
+          <TouchableOpacity onPress={() => setShowBeneficiaries(true)} style={styles.savedLink}>
+            <Ionicons name="star-outline" size={14} color={theme.brand.primary} />
+            <Text style={[textStyles.bodySm, { color: theme.brand.primary }]}>Select from saved beneficiaries</Text>
+          </TouchableOpacity>
           <Input
             label="Phone Number"
             value={phone}
@@ -363,21 +444,21 @@ export default function CableScreen() {
             keyboardType="phone-pad"
             maxLength={11}
             placeholder="08012345678"
-            style={{ marginTop: spacing[3] }}
+            containerStyle={{ marginTop: spacing[3] }}
           />
 
           {error ? <ErrorCard message={error} style={{ marginTop: spacing[3] }} /> : null}
           <Button
-            label={verifying ? 'Verifying…' : 'Verify Smartcard'}
+            label={verifying ? 'Verifying...' : 'Verify Smartcard'}
             onPress={verify}
             loading={verifying}
-            disabled={!plan || smartcard.length < 5}
+            disabled={smartcard.length < 5}
             style={{ marginTop: spacing[6] }}
           />
         </>
       )}
 
-      {/* ── Step 3: Customer + plan summary ── */}
+      {/* â”€â”€ Step 3: Customer + plan summary â”€â”€ */}
       {step === 'verify' && (
         <>
           <View style={[styles.customerCard, { backgroundColor: theme.bg.secondary, borderColor: theme.status.success }]}>
@@ -411,6 +492,94 @@ export default function CableScreen() {
           />
         </>
       )}
+
+      {/* â”€â”€ Beneficiaries modal (saved + recent) â”€â”€ */}
+      <Modal
+        visible={showBeneficiaries}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowBeneficiaries(false)}
+      >
+        <View style={styles.modalBg}>
+          <View style={[styles.modalCard, { backgroundColor: theme.bg.primary }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border.DEFAULT }]}>
+              <Text style={[textStyles.h3, { color: theme.text.primary }]}>Smartcards</Text>
+              <TouchableOpacity onPress={() => setShowBeneficiaries(false)}>
+                <Ionicons name="close" size={24} color={theme.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: spacing[8] }}>
+              {savedBeneficiaries.length > 0 && (
+                <>
+                  <Text style={[textStyles.labelSm, { color: theme.text.muted, letterSpacing: 0.8, paddingHorizontal: spacing[5], paddingTop: spacing[4], paddingBottom: spacing[2] }]}>SAVED</Text>
+                  {savedBeneficiaries.map((b) => (
+                    <TouchableOpacity key={b.id}
+                      onPress={() => { setSmartcard(b.details.smartcard); const p = providers.find((pr) => pr.id === b.details.providerId); if (p) setProvider(p); setShowBeneficiaries(false); }}
+                      style={[styles.beneficiaryRow, { borderBottomColor: theme.border.DEFAULT }]}>
+                      <Image source={{ uri: b.details.providerLogo }} style={styles.bLogo} resizeMode="contain" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[textStyles.label, { color: theme.text.primary }]}>{b.details.alias || b.details.customerName}</Text>
+                        <Text style={[textStyles.caption, { color: theme.text.muted }]}>{b.details.smartcard} · {b.details.providerName}</Text>
+                      </View>
+                      <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={async () => { setSavingId(b.id); await removeBeneficiary(b.id); setSavingId(null); }}>
+                        {savingId === b.id ? <ActivityIndicator size="small" color={theme.brand.primary} /> : <Ionicons name="star" size={20} color={theme.brand.primary} />}
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+
+              {beneficiaries.filter((c) => !savedBeneficiaries.some((b) => b.details.smartcard === c.smartcard && b.details.providerId === c.providerId)).length > 0 && (
+                <>
+                  <Text style={[textStyles.labelSm, { color: theme.text.muted, letterSpacing: 0.8, paddingHorizontal: spacing[5], paddingTop: spacing[4], paddingBottom: spacing[2] }]}>RECENTLY USED</Text>
+                  {beneficiaries
+                    .filter((c) => !savedBeneficiaries.some((b) => b.details.smartcard === c.smartcard && b.details.providerId === c.providerId))
+                    .map((item) => {
+                      const key = item.smartcard + item.providerId;
+                      return (
+                        <TouchableOpacity key={key}
+                          onPress={() => { setSmartcard(item.smartcard); const p = providers.find((pr) => pr.id === item.providerId); if (p) setProvider(p); setShowBeneficiaries(false); }}
+                          style={[styles.beneficiaryRow, { borderBottomColor: theme.border.DEFAULT }]}>
+                          <Image source={{ uri: item.providerLogo }} style={styles.bLogo} resizeMode="contain" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[textStyles.label, { color: theme.text.primary }]}>{item.customerName}</Text>
+                            <Text style={[textStyles.caption, { color: theme.text.muted }]}>{item.providerName} · {item.smartcard}</Text>
+                          </View>
+                          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => { setShowBeneficiaries(false); setPendingSave({ item, key }); }}>
+                            {savingId === key ? <ActivityIndicator size="small" color={theme.brand.primary} /> : <Ionicons name="star-outline" size={20} color={theme.text.muted} />}
+                          </TouchableOpacity>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </>
+              )}
+
+              {savedBeneficiaries.length === 0 && beneficiaries.length === 0 && (
+                <View style={styles.emptyWrap}>
+                  <Ionicons name="tv-outline" size={40} color={theme.text.muted} />
+                  <Text style={[textStyles.body, { color: theme.text.muted, marginTop: spacing[3], textAlign: 'center' }]}>
+                    No saved smartcards yet.{'\n'}Pay cable TV to save smartcards.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <SaveBeneficiaryModal
+        visible={!!pendingSave}
+        defaultAlias={pendingSave?.item.customerName ?? ''}
+        onCancel={() => setPendingSave(null)}
+        onSave={async (alias) => {
+          if (!pendingSave) return;
+          setSavingId(pendingSave.key);
+          setPendingSave(null);
+          await saveBeneficiary({ type: 'cable', label: pendingSave.item.smartcard, details: { ...pendingSave.item, alias } });
+          setSavingId(null);
+        }}
+      />
     </Screen>
   );
 }
@@ -434,8 +603,9 @@ const styles = StyleSheet.create({
   },
   chipLogo: { width: 36, height: 36 },
 
-planCard: {
-    width: 140, borderRadius: radius.xl, borderWidth: 1,
+  plansGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], marginTop: spacing[4] },
+  planCard: {
+    width: '47%', borderRadius: radius.xl, borderWidth: 1,
     padding: spacing[4], gap: spacing[0.5],
   },
 
@@ -450,4 +620,23 @@ planCard: {
     alignItems: 'center',
   },
   summaryLogo: { width: 40, height: 40 },
+
+  modalBg:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalCard: { borderTopLeftRadius: radius['2xl'], borderTopRightRadius: radius['2xl'], maxHeight: '70%', minHeight: 300 },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: spacing[5], paddingVertical: spacing[4], borderBottomWidth: 1,
+  },
+  emptyWrap: { alignItems: 'center', paddingTop: spacing[10], paddingBottom: spacing[10] },
+  beneficiaryRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingHorizontal: spacing[5], paddingVertical: spacing[4], borderBottomWidth: 0.5,
+  },
+  bLogo:     { width: 40, height: 40 },
+  savedLink: { flexDirection: 'row', alignItems: 'center', gap: spacing[1.5], marginTop: spacing[1.5], marginBottom: 0 },
+  saveBeneficiaryCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    borderWidth: 1, borderRadius: radius.xl, padding: spacing[4],
+    marginTop: spacing[4],
+  },
 });

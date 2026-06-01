@@ -1,19 +1,22 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback }         from 'react';
+import { useRouter }           from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { useToast } from '@/hooks/useToast';
-import { cryptoApi } from '@/api/crypto.api';
+import { useToast }            from '@/hooks/useToast';
+import {
+  fetchCryptoWallets,
+  fetchCryptoPrices,
+} from '@/store/slices/crypto.slice';
 
 const NGN_PER_USD = 1615;
 
 // Supported coins on GruuvyPay
 export const SUPPORTED_COINS = [
-  { id: 'bitcoin',  symbol: 'BTC',  name: 'Bitcoin',  icon: '₿',  color: '#F7931A' },
-  { id: 'ethereum', symbol: 'ETH',  name: 'Ethereum', icon: 'Ξ',  color: '#627EEA' },
-  { id: 'tether',   symbol: 'USDT', name: 'Tether',   icon: '₮',  color: '#26A17B' },
-  { id: 'solana',   symbol: 'SOL',  name: 'Solana',   icon: '◎',  color: '#9945FF' },
-  { id: 'litecoin', symbol: 'LTC',  name: 'Litecoin', icon: 'Ł',  color: '#BFBBBB' },
-  { id: 'ripple',   symbol: 'XRP',  name: 'XRP',      icon: 'X',  color: '#00AAE4' },
+  { id: 'bitcoin',  symbol: 'BTC',  name: 'Bitcoin',  abbr: 'BTC',  color: '#F7931A', logoUrl: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
+  { id: 'ethereum', symbol: 'ETH',  name: 'Ethereum', abbr: 'ETH',  color: '#627EEA', logoUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
+  { id: 'tether',   symbol: 'USDT', name: 'Tether',   abbr: 'USDT', color: '#26A17B', logoUrl: 'https://assets.coingecko.com/coins/images/325/small/Tether.png' },
+  { id: 'solana',   symbol: 'SOL',  name: 'Solana',   abbr: 'SOL',  color: '#9945FF', logoUrl: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
+  { id: 'litecoin', symbol: 'LTC',  name: 'Litecoin', abbr: 'LTC',  color: '#BFBBBB', logoUrl: 'https://assets.coingecko.com/coins/images/2/small/litecoin.png' },
+  { id: 'ripple',   symbol: 'XRP',  name: 'XRP',      abbr: 'XRP',  color: '#00AAE4', logoUrl: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
 ] as const;
 
 export type CoinSymbol = typeof SUPPORTED_COINS[number]['symbol'];
@@ -22,98 +25,113 @@ export interface CoinPrice {
   symbol:    CoinSymbol;
   priceNGN:  string;
   priceUSD:  string;
-  change24h: number;   // percentage e.g. 2.4 or -1.3
+  change24h: number;
   loading:   boolean;
 }
 
 export interface CoinHolding {
   symbol:   CoinSymbol;
-  balance:  string;    // crypto amount e.g. "0.00423"
-  valueNGN: string;    // formatted NGN value
+  balance:  string;
+  valueNGN: string;
 }
 
 export function useCryptoLogic() {
-  const router = useRouter();
-  const toast  = useToast();
+  const router    = useRouter();
+  const toast     = useToast();
+  const dispatch  = useAppDispatch();
 
-  const [prices,    setPrices]    = useState<Record<string, CoinPrice>>({});
-  const [holdings,  setHoldings]  = useState<CoinHolding[]>([]);
-  const [portfolio, setPortfolio] = useState({ totalNGN: '₦0.00', totalUSD: '$0.00' });
-  const [refreshing, setRefreshing] = useState(false);
-  const [pricesLoading, setPricesLoading] = useState(true);
+  const rawWallets      = useAppSelector((s) => s.crypto.wallets);
+  const rawPrices       = useAppSelector((s) => s.crypto.prices);
+  const walletsLoading  = useAppSelector((s) => s.crypto.walletsLoading);
+  const pricesLoading   = useAppSelector((s) => s.crypto.pricesLoading);
 
-  useEffect(() => {
-    loadPrices();
-    loadHoldings();
-  }, []);
+  // ── Derived: formatted prices ──────────────────────────────────────────
+  const prices: Record<string, CoinPrice> = Object.fromEntries(
+    Object.entries(rawPrices).map(([symbol, p]) => [
+      symbol,
+      {
+        symbol:    symbol as CoinSymbol,
+        priceUSD:  `$${p.priceUSD.toLocaleString('en-US', { maximumFractionDigits: p.priceUSD < 1 ? 4 : 2 })}`,
+        priceNGN:  `₦${p.priceNGN.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
+        change24h: p.change24h,
+        loading:   false,
+      },
+    ]),
+  );
 
-  async function loadPrices() {
-    setPricesLoading(true);
-    try {
-      const raw = await cryptoApi.getAllPrices();
-      const formatted: Record<string, CoinPrice> = {};
-      for (const [symbol, p] of Object.entries(raw) as [string, any][]) {
-        const usd = p.priceUSD as number;
-        const ngn = usd * NGN_PER_USD;
-        formatted[symbol] = {
-          symbol:    symbol as any,
-          priceUSD:  `$${usd.toLocaleString('en-US', { maximumFractionDigits: usd < 1 ? 4 : 2 })}`,
-          priceNGN:  `₦${ngn.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
-          change24h: p.change24h ?? 0,
-          loading:   false,
-        };
-      }
-      setPrices(formatted);
-    } catch (err: any) {
-      toast.error('Prices unavailable', 'Could not load crypto prices');
-    } finally {
-      setPricesLoading(false);
-    }
-  }
+  // ── Derived: holdings (non-zero balances) ──────────────────────────────
+  const holdings: CoinHolding[] = rawWallets
+    .filter((w) => parseFloat(w.balance ?? '0') > 0)
+    .map((w) => {
+      const priceUSD = rawPrices[w.symbol.toUpperCase()]?.priceUSD ?? 0;
+      const bal      = parseFloat(w.balance ?? '0');
+      const usdVal   = bal * priceUSD;
+      return {
+        symbol:   w.symbol as CoinSymbol,
+        balance:  bal.toFixed(bal < 0.01 ? 6 : 4),
+        valueNGN: `₦${(usdVal * NGN_PER_USD).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
+      };
+    });
 
-  async function loadHoldings() {
-    // TODO: load from Tatum wallet API
-    // Empty for new users
-    setHoldings([]);
-    setPortfolio({ totalNGN: '₦0.00', totalUSD: '$0.00' });
-  }
+  // ── Derived: portfolio totals ──────────────────────────────────────────
+  const totalUSD = rawWallets.reduce((sum, w) => {
+    const priceUSD = rawPrices[w.symbol.toUpperCase()]?.priceUSD ?? 0;
+    return sum + parseFloat(w.balance ?? '0') * priceUSD;
+  }, 0);
 
+  const portfolio = {
+    totalNGN: `₦${(totalUSD * NGN_PER_USD).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
+    totalUSD: `$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+  };
+
+  // ── Refresh ────────────────────────────────────────────────────────────
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadPrices(), loadHoldings()]);
-    setRefreshing(false);
-  }, []);
+    await Promise.all([
+      dispatch(fetchCryptoWallets()).unwrap().catch(() => toast.error('Could not refresh balances')),
+      dispatch(fetchCryptoPrices()).unwrap().catch(() => toast.error('Could not refresh prices')),
+    ]);
+  }, [dispatch]);
 
-  function handleBuy(symbol: CoinSymbol) {
-    router.push({ pathname: '/(app)/crypto/buy', params: { symbol } });
+  // ── Load on first mount ────────────────────────────────────────────────
+  // Components call this once. Persisted data renders immediately;
+  // these fetches run in background and update when done.
+  function loadAll() {
+    dispatch(fetchCryptoWallets()).unwrap().catch(() => {});
+    dispatch(fetchCryptoPrices()).unwrap().catch(() => {});
   }
 
-  function handleSell(symbol: CoinSymbol) {
-    router.push({ pathname: '/(app)/crypto/sell', params: { symbol } });
+  // ── Navigation helpers ─────────────────────────────────────────────────
+  // With symbol → go straight to personalized screen (from coin row)
+  // Without symbol → go to coin picker first (from portfolio card buttons)
+  function handleBuy(symbol?: CoinSymbol) {
+    if (symbol) router.push({ pathname: '/(app)/crypto/buy'    as any, params: { symbol } });
+    else        router.push({ pathname: '/(app)/crypto/select' as any, params: { mode: 'buy' } });
   }
-
+  function handleSell(symbol?: CoinSymbol) {
+    if (symbol) router.push({ pathname: '/(app)/crypto/sell'   as any, params: { symbol } });
+    else        router.push({ pathname: '/(app)/crypto/select' as any, params: { mode: 'sell' } });
+  }
+  function handleSend(symbol?: CoinSymbol) {
+    if (symbol) router.push({ pathname: '/(app)/crypto/send'   as any, params: { symbol } });
+    else        router.push({ pathname: '/(app)/crypto/select' as any, params: { mode: 'send' } });
+  }
+  function handleReceive(symbol?: CoinSymbol) {
+    if (symbol) router.push({ pathname: '/(app)/crypto/receive' as any, params: { symbol } });
+    else        router.push({ pathname: '/(app)/crypto/select'  as any, params: { mode: 'receive' } });
+  }
   function handleCoinDetail(symbol: CoinSymbol) {
-    router.push({ pathname: '/(app)/crypto/[symbol]', params: { symbol } });
+    router.push({ pathname: '/(app)/crypto/[symbol]' as any, params: { symbol } });
   }
-
-  function handleSend(symbol: CoinSymbol) {
-    router.push({ pathname: '/(app)/crypto/send', params: { symbol } });
-  }
-
-  function handleReceive(symbol: CoinSymbol) {
-    router.push({ pathname: '/(app)/crypto/receive', params: { symbol } });
-  }
-
-  const hasHoldings = holdings.length > 0;
 
   return {
     prices,
     holdings,
     portfolio,
-    refreshing,
+    refreshing:    walletsLoading || pricesLoading,
     pricesLoading,
-    hasHoldings,
+    hasHoldings:   holdings.length > 0,
     onRefresh,
+    loadAll,
     handleBuy,
     handleSell,
     handleCoinDetail,

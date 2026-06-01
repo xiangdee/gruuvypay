@@ -1,1 +1,0 @@
-incorrect pin error still, any pin can go, biometric only showing in login screen pins

@@ -2,7 +2,7 @@
   "expo": {
     "name": "GruuvyPay",
     "slug": "gruuvypay",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon2.png",
     "scheme": "gruuvypay",
@@ -81,7 +81,8 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

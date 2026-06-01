@@ -108,6 +108,7 @@ export function useSendMoney() {
       pin,
       idempotencyKey, // same key on retry = no double-send
     }));
+    console.log(reset)
 
     setLoading(false);
 
@@ -115,9 +116,11 @@ export function useSendMoney() {
       setTxRef(result.payload.reference);
       setStep('success');
     } else {
+      const errorMsg = (result.payload as string) ?? '';
+      setIdempotencyKey(uuidv4());
       setPinError(true);
       pinRef.current?.shake();
-      toast.error('Transfer failed', result.payload as string);
+      toast.error('Transfer failed', errorMsg);
     }
   }
 

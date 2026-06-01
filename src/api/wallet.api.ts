@@ -59,6 +59,17 @@ export const walletApi = {
     return data;
   },
 
+  generateOneTimeAccount: async (amount: number): Promise<{
+    accountNumber: string;
+    bankName:      string;
+    accountName:   string;
+    amount:        number;
+    expiresAt:     string;
+  }> => {
+    const { data } = await apiClient.post('/wallet/one-time-account', { amount });
+    return data;
+  },
+
   sendToBank: async (payload: {
     accountBank:   string;
     accountNumber: string;
@@ -76,4 +87,33 @@ export const walletApi = {
     });
     return data;
   },
+
+  getBeneficiaries: async (type?: string): Promise<Beneficiary[]> => {
+    const { data } = await apiClient.get('/wallet/beneficiaries', { params: type ? { type } : {} });
+    return data;
+  },
+
+  addBeneficiary: async (payload: {
+    type:    string;
+    label:   string;
+    details: Record<string, any>;
+  }): Promise<Beneficiary> => {
+    const { data } = await apiClient.post('/wallet/beneficiaries', payload);
+    return data;
+  },
+
+  deleteBeneficiary: async (id: string): Promise<{ success: boolean }> => {
+    const { data } = await apiClient.delete(`/wallet/beneficiaries/${id}`);
+    return data;
+  },
 };
+
+export interface Beneficiary {
+  id:        string;
+  userId:    string;
+  type:      string;
+  label:     string;
+  details:   Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}

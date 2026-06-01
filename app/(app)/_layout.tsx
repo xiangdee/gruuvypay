@@ -107,13 +107,14 @@ export default function AppLayout() {
       />
 
       {/* ── Hidden top-level screens ───────────────────────────────────── */}
-      <Tabs.Screen name="analytics"     options={{ href: null }} />
-      <Tabs.Screen name="rewards"       options={{ href: null }} />
-      <Tabs.Screen name="convert"       options={{ href: null }} />
-      <Tabs.Screen name="send"          options={{ href: null }} />
-      <Tabs.Screen name="top-up"        options={{ href: null }} />
-      <Tabs.Screen name="transactions"  options={{ href: null }} />
-      <Tabs.Screen name="transaction"   options={{ href: null }} />
+      <Tabs.Screen name="analytics"          options={{ href: null }} />
+      <Tabs.Screen name="rewards"            options={{ href: null }} />
+      <Tabs.Screen name="convert"            options={{ href: null }} />
+      <Tabs.Screen name="send"               options={{ href: null }} />
+      <Tabs.Screen name="top-up"             options={{ href: null }} />
+      <Tabs.Screen name="transactions"       options={{ href: null }} />
+      <Tabs.Screen name="transaction"        options={{ href: null }} />
+      <Tabs.Screen name="one-time-account"   options={{ href: null }} />
 
       {/* ── Folder groups — their sub-screens are managed by nested Stacks ── */}
       <Tabs.Screen name="bills"  options={{ href: null }} />

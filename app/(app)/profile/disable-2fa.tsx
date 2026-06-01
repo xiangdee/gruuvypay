@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,7 +34,7 @@ export default function Disable2faScreen() {
       toast.success('2FA disabled', 'Your account no longer requires a second factor.');
       router.back();
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Incorrect PIN. Please try again.';
+      const msg = err?.message ?? 'Incorrect PIN. Please try again.';
       setPinError(msg);
       pinRef.current?.shake();
       pinRef.current?.reset();

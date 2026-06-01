@@ -19,6 +19,21 @@ const COIN_COLORS: Record<string, string> = {
   SOL: '#9945FF', LTC: '#BFBBBB', XRP: '#00AAE4',
 };
 
+// Minimum deposit amounts enforced by Quidax (same as backend MIN_DEPOSIT)
+const MIN_DEPOSIT: Record<string, string> = {
+  BTC:  '0.0001 BTC',
+  ETH:  '0.001 ETH',
+  USDT: '10 USDT',
+  SOL:  '0.01 SOL',
+  LTC:  '0.001 LTC',
+  XRP:  '1 XRP',
+};
+
+// Required confirmations before deposit is credited
+const CONFIRMATIONS: Record<string, number> = {
+  BTC: 3, ETH: 12, USDT: 1, SOL: 1, LTC: 6, XRP: 1,
+};
+
 const COIN_WARNINGS: Record<string, string> = {
   USDT: 'Only send TRC-20 USDT to this address. Sending ERC-20 USDT will result in permanent loss.',
   XRP:  'This coin requires a destination tag. Always include the memo/tag when sending.',
@@ -33,16 +48,42 @@ export default function CryptoReceiveScreen() {
   const coin       = symbol?.toUpperCase() ?? 'BTC';
   const coinColor  = COIN_COLORS[coin] ?? '#1B4FD8';
 
-  const [wallet,  setWallet]  = useState<CryptoWallet | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [copied,  setCopied]  = useState(false);
+  const [wallet,       setWallet]       = useState<CryptoWallet | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [copied,       setCopied]       = useState(false);
+  const [notSetUp,     setNotSetUp]     = useState(false);
+  const [settingUp,    setSettingUp]    = useState(false);
 
-  useEffect(() => {
-    cryptoApi.getWallet(coin)
-      .then(setWallet)
-      .catch(() => toast.error('Could not load wallet address'))
-      .finally(() => setLoading(false));
-  }, [coin]);
+  async function fetchWallet() {
+    setLoading(true);
+    setNotSetUp(false);
+    try {
+      const w = await cryptoApi.getWallet(coin);
+      setWallet(w);
+    } catch (e: any) {
+      if (e?.statusCode === 404) {
+        setNotSetUp(true);
+      } else {
+        toast.error('Could not load wallet address');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchWallet(); }, [coin]);
+
+  async function handleSetUp() {
+    setSettingUp(true);
+    try {
+      await cryptoApi.setupCryptoAccount();
+      await fetchWallet();
+    } catch {
+      toast.error('Setup failed. Please try again.');
+    } finally {
+      setSettingUp(false);
+    }
+  }
 
   async function copyAddress() {
     if (!wallet?.address) return;
@@ -73,6 +114,30 @@ export default function CryptoReceiveScreen() {
 
       {loading ? (
         <ActivityIndicator size="large" color={theme.brand.primary} style={{ marginTop: spacing[10] }} />
+      ) : notSetUp ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="wallet-outline" size={56} color={theme.text.muted} />
+          <Text style={[textStyles.h3, { color: theme.text.primary, marginTop: spacing[4], textAlign: 'center' }]}>
+            Crypto Not Set Up
+          </Text>
+          <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
+            Your crypto account needs to be initialised before you can receive {coin}.
+          </Text>
+          <TouchableOpacity
+            onPress={handleSetUp}
+            disabled={settingUp}
+            style={[styles.setupBtn, { backgroundColor: theme.brand.primary }]}
+            activeOpacity={0.85}
+          >
+            {settingUp
+              ? <ActivityIndicator size="small" color="#000" />
+              : <Ionicons name="flash-outline" size={18} color="#000" />
+            }
+            <Text style={[textStyles.label, { color: '#000' }]}>
+              {settingUp ? 'Setting up...' : 'Set Up Crypto Account'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
@@ -155,10 +220,10 @@ export default function CryptoReceiveScreen() {
               Network: <Text style={{ color: coinColor }}>{wallet?.network?.toUpperCase()}</Text>
             </Text>
             <Text style={[textStyles.bodySm, { color: theme.text.secondary, marginTop: spacing[1] }]}>
-              Minimum deposit: 0.0001 {coin}
+              Minimum deposit: {MIN_DEPOSIT[coin] ?? `0.0001 ${coin}`}
             </Text>
             <Text style={[textStyles.bodySm, { color: theme.text.secondary, marginTop: spacing[1] }]}>
-              Confirmations required: {coin === 'BTC' ? '3' : coin === 'ETH' ? '12' : '1'}
+              Confirmations required: {CONFIRMATIONS[coin] ?? 1}
             </Text>
           </View>
 
@@ -176,6 +241,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
   },
   content:       { padding: spacing[4], gap: spacing[4] },
+  emptyState: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    padding: spacing[8],
+  },
+  setupBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    borderRadius: radius.xl, paddingVertical: spacing[4], paddingHorizontal: spacing[6],
+    marginTop: spacing[6],
+  },
   warningBanner: { flexDirection: 'row', gap: spacing[2], borderRadius: radius.lg, borderWidth: 1, padding: spacing[3] },
   qrCard:        { alignItems: 'center', borderRadius: radius['2xl'], padding: spacing[6] },
   addressCard:   { borderRadius: radius.xl, padding: spacing[4], gap: spacing[1] },

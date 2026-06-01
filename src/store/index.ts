@@ -7,10 +7,11 @@ import {
 } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import authReducer from './slices/auth.slice';
-import uiReducer from './slices/ui.slice';
+import authReducer   from './slices/auth.slice';
+import uiReducer     from './slices/ui.slice';
 import walletReducer from './slices/wallet.slice';
 import currencyReducer from './slices/currency.slice';
+import cryptoReducer from './slices/crypto.slice';
 
 // ─── Persist configs ──────────────────────────────────────────────────
 // IMPORTANT: Never persist the access token — always re-derive from
@@ -31,14 +32,18 @@ const uiPersistConfig = {
 };
 
 
-// Wallet is NOT persisted — always fresh from API
-// Balance shown from cache only during loading state
+const cryptoPersistConfig = {
+  key:       'crypto',
+  storage:   AsyncStorage,
+  whitelist: ['wallets', 'prices'], // persist last known balances + prices
+};
 
 const rootReducer = combineReducers({
-  auth:   persistReducer(authPersistConfig, authReducer),
-  ui:     persistReducer(uiPersistConfig, uiReducer),
-  wallet: walletReducer,  // no persistence — always refetch
-  currency: persistReducer(authPersistConfig,currencyReducer)
+  auth:     persistReducer(authPersistConfig, authReducer),
+  ui:       persistReducer(uiPersistConfig, uiReducer),
+  wallet:   walletReducer,
+  currency: persistReducer(authPersistConfig, currencyReducer),
+  crypto:   persistReducer(cryptoPersistConfig, cryptoReducer),
 });
 
 export const store = configureStore({

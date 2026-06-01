@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Dimensions,
+  ScrollView, ActivityIndicator, Dimensions, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +15,6 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const CHART_H = 160;
 const CHART_W = SCREEN_W - spacing[8] * 2;
 
-// Build an SVG polyline path from an array of values
 function buildPath(values: number[]): string {
   if (values.length < 2) return '';
   const min = Math.min(...values);
@@ -51,6 +50,46 @@ function simulatePriceHistory(baseUSD: number, points: number, volatility: numbe
 const RANGES = ['1D', '1W', '1M', '3M', '1Y'] as const;
 type Range = typeof RANGES[number];
 
+// ─── Transaction row ──────────────────────────────────────────────────────────
+const TX_STATE_COLOR: Record<string, string> = {
+  accepted:  '#22C55E',
+  submitted: '#F59E0B',
+  failed:    '#EF4444',
+  rejected:  '#EF4444',
+};
+
+function TxRow({ tx, symbol, theme }: { tx: any; symbol: string; theme: any }) {
+  const isDeposit  = tx.type === 'deposit' || tx.kind === 'deposit' || !!tx.txid;
+  const label      = isDeposit ? 'Received' : 'Sent';
+  const icon       = isDeposit ? 'arrow-down-circle' : 'arrow-up-circle';
+  const iconColor  = isDeposit ? '#22C55E' : '#EF4444';
+  const stateColor = TX_STATE_COLOR[tx.state] ?? '#6B7280';
+  const amount     = tx.amount ?? tx.volume ?? '—';
+  const date       = tx.created_at
+    ? new Date(tx.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+
+  return (
+    <View style={[styles.txRow, { borderBottomColor: theme.border.DEFAULT }]}>
+      <View style={[styles.txIcon, { backgroundColor: iconColor + '18' }]}>
+        <Ionicons name={icon as any} size={18} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[textStyles.label, { color: theme.text.primary }]}>{label}</Text>
+        <Text style={[textStyles.caption, { color: theme.text.muted }]}>{date}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={[textStyles.label, { color: theme.text.primary }]}>
+          {isDeposit ? '+' : '-'}{amount} {symbol}
+        </Text>
+        <Text style={[textStyles.caption, { color: stateColor, textTransform: 'capitalize' }]}>
+          {tx.state ?? 'confirmed'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function CoinDetailScreen() {
   const { theme }    = useTheme();
   const router       = useRouter();
@@ -58,12 +97,14 @@ export default function CoinDetailScreen() {
 
   const coin = SUPPORTED_COINS.find((c) => c.symbol === symbol);
 
-  const [wallet,    setWallet]    = useState<any>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [range,     setRange]     = useState<Range>('1D');
-  const [priceUSD,  setPriceUSD]  = useState<number>(0);
-  const [change24h, setChange24h] = useState<number>(0);
-  const [chartData, setChartData] = useState<number[]>([]);
+  const [wallet,       setWallet]       = useState<any>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [txList,       setTxList]       = useState<any[]>([]);
+  const [txLoading,    setTxLoading]    = useState(true);
+  const [range,        setRange]        = useState<Range>('1D');
+  const [priceUSD,     setPriceUSD]     = useState<number>(0);
+  const [change24h,    setChange24h]    = useState<number>(0);
+  const [chartData,    setChartData]    = useState<number[]>([]);
 
   const rebuildChart = useCallback((base: number, r: Range) => {
     const cfg = RANGE_CONFIG[r];
@@ -77,6 +118,7 @@ export default function CoinDetailScreen() {
 
   useEffect(() => {
     load();
+    loadTxs();
   }, [symbol]);
 
   function onRangeChange(r: Range) {
@@ -113,6 +155,19 @@ export default function CoinDetailScreen() {
     }
   }
 
+  async function loadTxs() {
+    if (!symbol) return;
+    setTxLoading(true);
+    try {
+      const data = await cryptoApi.getTransactions(symbol);
+      setTxList(Array.isArray(data) ? data.slice(0, 20) : []);
+    } catch {
+      setTxList([]);
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
   if (!coin) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
@@ -133,12 +188,16 @@ export default function CoinDetailScreen() {
             <Ionicons name="arrow-back" size={24} color={theme.text.primary} />
           </TouchableOpacity>
           <View style={styles.coinTitle}>
-            <View style={[styles.coinIcon, { backgroundColor: coin.color + '20' }]}>
-              <Text style={[styles.coinIconText, { color: coin.color }]}>{coin.icon}</Text>
+            <View style={[styles.coinIcon, { backgroundColor: coin.color + '18' }]}>
+              <Image
+                source={{ uri: coin.logoUrl }}
+                style={styles.coinLogo}
+                resizeMode="contain"
+              />
             </View>
             <View>
               <Text style={[textStyles.h3, { color: theme.text.primary }]}>{coin.name}</Text>
-              <Text style={[textStyles.caption, { color: theme.text.muted }]}>{coin.symbol}</Text>
+              <Text style={[textStyles.caption, { color: theme.text.muted, fontWeight: '600' }]}>{coin.abbr}</Text>
             </View>
           </View>
           <View style={{ width: 40 }} />
@@ -172,13 +231,10 @@ export default function CoinDetailScreen() {
                 <Stop offset="100%" stopColor={chartColor} stopOpacity="0" />
               </LinearGradient>
             </Defs>
-            {/* Area fill */}
             <Path d={areaPath} fill="url(#grad)" />
-            {/* Line */}
             <Path d={linePath} stroke={chartColor} strokeWidth={2} fill="none" />
           </Svg>
 
-          {/* Range selector */}
           <View style={styles.rangeRow}>
             {RANGES.map((r) => (
               <TouchableOpacity
@@ -211,7 +267,7 @@ export default function CoinDetailScreen() {
             <View style={styles.holdingsRow}>
               <View>
                 <Text style={[textStyles.h3, { color: theme.text.primary }]}>
-                  {wallet?.balance ?? '0.00'} {coin.symbol}
+                  {wallet?.balance ?? '0.00'} {coin.abbr}
                 </Text>
                 <Text style={[textStyles.caption, { color: theme.text.muted }]}>
                   ≈ ₦{((parseFloat(wallet?.balance ?? '0') * priceUSD * NGN_PER_USD)).toLocaleString('en-NG', { maximumFractionDigits: 0 })}
@@ -243,12 +299,37 @@ export default function CoinDetailScreen() {
             theme={theme}
           />
           <ActionBtn
+            icon="paper-plane-outline"
+            label="Send"
+            color="#F59E0B"
+            onPress={() => router.push({ pathname: '/(app)/crypto/send', params: { symbol } })}
+            theme={theme}
+          />
+          <ActionBtn
             icon="qr-code-outline"
             label="Receive"
             color="#6366F1"
             onPress={() => router.push({ pathname: '/(app)/crypto/receive', params: { symbol } })}
             theme={theme}
           />
+        </View>
+
+        {/* ── Transactions ───────────────────────────────────────────── */}
+        <View style={[styles.txCard, { backgroundColor: theme.bg.secondary }]}>
+          <Text style={[textStyles.labelSm, { color: theme.text.muted, letterSpacing: 0.8, marginBottom: spacing[3] }]}>
+            {coin.abbr} TRANSACTIONS
+          </Text>
+          {txLoading ? (
+            <ActivityIndicator color={theme.brand.primary} />
+          ) : txList.length === 0 ? (
+            <Text style={[textStyles.caption, { color: theme.text.muted, textAlign: 'center', paddingVertical: spacing[4] }]}>
+              No {coin.abbr} transactions yet
+            </Text>
+          ) : (
+            txList.map((tx, i) => (
+              <TxRow key={tx.id ?? i} tx={tx} symbol={coin.abbr} theme={theme} />
+            ))
+          )}
         </View>
 
         {/* ── About ──────────────────────────────────────────────────── */}
@@ -292,18 +373,19 @@ function getAbout(symbol: string): string {
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1 },
-  header:  {
+  safe:   { flex: 1 },
+  header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
   },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  backBtn:   { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   coinTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   coinIcon: {
     width: 44, height: 44, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
-  coinIconText: { fontSize: 22, fontWeight: '800' },
+  coinLogo: { width: 28, height: 28 },
 
   priceSection: {
     paddingHorizontal: spacing[5], paddingVertical: spacing[2],
@@ -315,10 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
 
-  chartContainer: {
-    paddingHorizontal: spacing[4],
-    paddingVertical:   spacing[4],
-  },
+  chartContainer: { paddingHorizontal: spacing[4], paddingVertical: spacing[4] },
   rangeRow: {
     flexDirection: 'row', justifyContent: 'center',
     gap: spacing[1], marginTop: spacing[3],
@@ -347,6 +426,20 @@ const styles = StyleSheet.create({
   actionBtn:  { alignItems: 'center', gap: spacing[1] },
   actionIcon: {
     width: 56, height: 56, borderRadius: radius.full,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  txCard: {
+    marginHorizontal: spacing[4], borderRadius: radius.xl,
+    padding: spacing[4], marginBottom: spacing[4],
+  },
+  txRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 0.5,
+  },
+  txIcon: {
+    width: 38, height: 38, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center',
   },
 

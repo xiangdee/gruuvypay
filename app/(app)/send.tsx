@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Modal,
-  FlatList, ActivityIndicator, StyleSheet,
+  FlatList, ActivityIndicator, StyleSheet, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +17,11 @@ import { useToast } from '@/hooks/useToast';
 import { useBiometricPin } from '@/hooks/useBiometricPin';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { recentCache, RecentTransfer } from '@/services/recentCache';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
+
+const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899', '#F97316'];
+function avatarColor(name: string) { return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]; }
 
 export default function SendMoneyScreen() {
   const { theme } = useTheme();
@@ -31,6 +36,30 @@ export default function SendMoneyScreen() {
     onPinComplete, setQuickAmount, goBack,
     sendAnother, goHome, getTierInfo,
   } = useSendMoney();
+
+  // ── Transfers cache + server beneficiaries ────────────────────────────
+  const [recentTransfers, setRecentTransfers] = useState<RecentTransfer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { beneficiaries: savedBeneficiaries, add: saveBeneficiary, remove: removeSavedBeneficiary } = useBeneficiaries('transfer');
+
+  useEffect(() => {
+    recentCache.getTransfers().then(setRecentTransfers);
+  }, []);
+
+  // Save to cache when tag transfer succeeds
+  useEffect(() => {
+    if (step === 'success' && recipient && txRef) {
+      const item: RecentTransfer = { id: txRef, type: 'tag', name: recipient.name, identifier: recipient.username };
+      recentCache.addTransfer(item).then(() => recentCache.getTransfers().then(setRecentTransfers));
+    }
+  }, [step, txRef]);
+
+  // Tag suggestions: filter by typed value, or show top 3 on empty focus
+  const tagSuggestions = recentTransfers
+    .filter((t) => t.type === 'tag')
+    .filter((t) => !tag.trim() || t.name.toLowerCase().includes(tag.toLowerCase()) ||
+      t.identifier.toLowerCase().includes(tag.replace('@', '').toLowerCase()))
+    .slice(0, 4);
 
   // ── Bank flow state ──────────────────────────────────────────────────
   const [bankStep, setBankStep]               = useState<'details' | 'amount' | 'pin' | 'success'>('details');
@@ -79,7 +108,7 @@ export default function SendMoneyScreen() {
       const result = await walletApi.verifyBankAccount(bankAccNumber, selectedBank.code);
       setVerifiedAcc(result);
     } catch (err: any) {
-      setVerifyError(err?.response?.data?.message ?? 'Could not verify account');
+      setVerifyError(err?.message ?? 'Could not verify account');
     } finally {
       setVerifying(false);
     }
@@ -115,11 +144,23 @@ export default function SendMoneyScreen() {
         idempotencyKey: bankIdempotencyKey.current,
       });
       setBankTxRef(result.reference);
+      // Save to recent cache
+      await recentCache.addTransfer({
+        id:       result.reference,
+        type:     'bank',
+        name:     verifiedAcc!.accountName,
+        identifier: bankAccNumber,
+        bankCode: selectedBank!.code,
+        bankName: selectedBank!.name,
+      });
+      const fresh = await recentCache.getTransfers();
+      setRecentTransfers(fresh);
       setBankStep('success');
     } catch (err: any) {
+      bankIdempotencyKey.current = uuidv4();
       setBankPinError(true);
       bankPinRef.current?.shake();
-      toast.error(err?.response?.data?.message ?? 'Transfer failed');
+      toast.error(err?.message || 'Transfer failed');
     } finally {
       setBankLoading(false);
     }
@@ -151,20 +192,36 @@ export default function SendMoneyScreen() {
     b.code.includes(bankSearch),
   );
 
-  // ── Inline verify element for the account number input ───────────────
+  // Pre-fill a bank beneficiary from the icons row
+  function selectBankBeneficiary(t: RecentTransfer) {
+    if (!t.bankCode || !t.bankName) return;
+    setSendMethod('bank');
+    setSelectedBank({ code: t.bankCode, name: t.bankName });
+    setBankAccNumber(t.identifier);
+    setVerifiedAcc({ accountNumber: t.identifier, accountName: t.name });
+    setVerifyError('');
+    setBankStep('details');
+  }
+
+  // Pre-fill a tag beneficiary
+  function selectTagBeneficiary(t: RecentTransfer) {
+    setSendMethod('tag');
+    setTag(t.identifier);
+    setShowSuggestions(false);
+  }
+
+  function selectBeneficiary(t: RecentTransfer) {
+    if (t.type === 'bank') selectBankBeneficiary(t);
+    else selectTagBeneficiary(t);
+  }
+
+  // ── Inline verify element ────────────────────────────────────────────
   function VerifyAction() {
-    if (verifying) {
-      return <ActivityIndicator size="small" color={theme.brand.primary} />;
-    }
-    if (verifiedAcc) {
-      return <Ionicons name="checkmark-circle" size={20} color={theme.status.success} />;
-    }
+    if (verifying) return <ActivityIndicator size="small" color={theme.brand.primary} />;
+    if (verifiedAcc) return <Ionicons name="checkmark-circle" size={20} color={theme.status.success} />;
     if (bankAccNumber.length === 10 && selectedBank) {
       return (
-        <TouchableOpacity
-          onPress={verifyBankAccount}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
+        <TouchableOpacity onPress={verifyBankAccount} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={[textStyles.label, { color: verifyError ? theme.status.error : theme.brand.primary }]}>
             {verifyError ? 'Retry' : 'Verify'}
           </Text>
@@ -172,6 +229,59 @@ export default function SendMoneyScreen() {
       );
     }
     return null;
+  }
+
+  // ── Beneficiary icons row (saved server + recent local) ─────────────
+  function BeneficiaryRow() {
+    const hasSaved  = savedBeneficiaries.length > 0;
+    const hasRecent = recentTransfers.length > 0;
+    if (!hasSaved && !hasRecent) return null;
+
+    // Merge: saved first (with star), then recent not already saved
+    const recentNotSaved = recentTransfers.filter(
+      (t) => !savedBeneficiaries.some((b) => b.details.identifier === t.identifier && b.details.type === t.type)
+    );
+
+    return (
+      <View style={styles.beneficiarySection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.beneficiaryScroll}>
+          {savedBeneficiaries.slice(0, 4).map((b) => {
+            const t = b.details as RecentTransfer;
+            return (
+              <View key={b.id} style={styles.beneficiaryItem}>
+                <TouchableOpacity onPress={() => selectBeneficiary(t)}>
+                  <View style={[styles.beneficiaryAvatar, { backgroundColor: avatarColor(t.name) }]}>
+                    {t.type === 'bank'
+                      ? <Ionicons name="business-outline" size={18} color="#fff" />
+                      : <Text style={[textStyles.label, { color: '#fff' }]}>{t.name[0].toUpperCase()}</Text>
+                    }
+                    <View style={styles.starBadge}>
+                      <Ionicons name="star" size={10} color="#F59E0B" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+                <Text style={[textStyles.caption, { color: theme.text.secondary, marginTop: spacing[1] }]} numberOfLines={1}>
+                  {t.name.split(' ')[0]}
+                </Text>
+              </View>
+            );
+          })}
+          {recentNotSaved.slice(0, 4).map((t) => (
+            <TouchableOpacity key={t.id} onPress={() => selectBeneficiary(t)} style={styles.beneficiaryItem}>
+              <View style={[styles.beneficiaryAvatar, { backgroundColor: avatarColor(t.name) }]}>
+                {t.type === 'bank'
+                  ? <Ionicons name="business-outline" size={18} color="#fff" />
+                  : <Text style={[textStyles.label, { color: '#fff' }]}>{t.name[0].toUpperCase()}</Text>
+                }
+              </View>
+              <Text style={[textStyles.caption, { color: theme.text.secondary, marginTop: spacing[1] }]} numberOfLines={1}>
+                {t.name.split(' ')[0]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
   }
 
   // ── Bank flow rendering ───────────────────────────────────────────────
@@ -335,6 +445,8 @@ export default function SendMoneyScreen() {
           <View style={styles.screen}>
             <Header title="Bank Withdrawal" onBack={handleBankBack} theme={theme} />
 
+            <BeneficiaryRow />
+
             <View style={[styles.methodTabs, { backgroundColor: theme.bg.secondary }]}>
               {(['tag', 'bank'] as const).map((m) => (
                 <TouchableOpacity
@@ -362,7 +474,6 @@ export default function SendMoneyScreen() {
                 Transfer to any Nigerian bank account
               </Text>
 
-              {/* Bank selector */}
               <TouchableOpacity
                 onPress={() => setShowPicker(true)}
                 style={[styles.bankSelector, { backgroundColor: theme.bg.input, borderColor: theme.border.DEFAULT }]}
@@ -377,7 +488,6 @@ export default function SendMoneyScreen() {
                 }
               </TouchableOpacity>
 
-              {/* Account number with inline verify */}
               <View style={{ marginTop: spacing[3] }}>
                 <Input
                   placeholder="Account number (10 digits)"
@@ -397,7 +507,6 @@ export default function SendMoneyScreen() {
                 />
               </View>
 
-              {/* Verified account name */}
               {verifiedAcc && (
                 <View style={[styles.verifiedCard, { backgroundColor: theme.status.success + '15', borderColor: theme.status.success + '40' }]}>
                   <Ionicons name="checkmark-circle" size={20} color={theme.status.success} />
@@ -414,7 +523,6 @@ export default function SendMoneyScreen() {
           </View>
         </KeyboardView>
 
-        {/* Bank picker modal */}
         <Modal visible={showPicker} animationType="slide" onRequestClose={() => setShowPicker(false)}>
           <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
             <View style={[styles.pickerHeader, { borderBottomColor: theme.border.DEFAULT }]}>
@@ -465,6 +573,8 @@ export default function SendMoneyScreen() {
           <View style={styles.screen}>
             <Header title="Send Money" onBack={goBack} theme={theme} />
 
+            <BeneficiaryRow />
+
             <View style={[styles.methodTabs, { backgroundColor: theme.bg.secondary }]}>
               {(['tag', 'bank'] as const).map((m) => (
                 <TouchableOpacity
@@ -491,17 +601,45 @@ export default function SendMoneyScreen() {
               <Text style={[textStyles.body, { color: theme.text.secondary, marginBottom: spacing[6] }]}>
                 Enter their GruuvyTag to send money instantly
               </Text>
-              <Input
-                placeholder="@username"
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={tag}
-                onChangeText={setTag}
-                error={tagError}
-                leftIcon={<Ionicons name="at" size={20} color={theme.text.muted} />}
-                returnKeyType="search"
-                onSubmitEditing={lookupTag}
-              />
+
+              {/* Input + suggestion box */}
+              <View style={styles.inputWrap}>
+                <Input
+                  placeholder="@username"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={tag}
+                  onChangeText={(v) => { setTag(v); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  error={tagError}
+                  leftIcon={<Ionicons name="at" size={20} color={theme.text.muted} />}
+                  returnKeyType="search"
+                  onSubmitEditing={lookupTag}
+                />
+
+                {/* Absolute suggestion dropdown */}
+                {showSuggestions && tagSuggestions.length > 0 && (
+                  <View style={[styles.suggestionBox, { backgroundColor: theme.bg.card, borderColor: theme.border.DEFAULT, shadowColor: theme.text.primary }]}>
+                    {tagSuggestions.map((t) => (
+                      <TouchableOpacity
+                        key={t.id}
+                        onPress={() => { setTag(t.identifier); setShowSuggestions(false); }}
+                        style={[styles.suggestionRow, { borderBottomColor: theme.border.DEFAULT }]}
+                      >
+                        <View style={[styles.suggestAvatar, { backgroundColor: avatarColor(t.name) }]}>
+                          <Text style={[textStyles.labelSm, { color: '#fff' }]}>{t.name[0].toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[textStyles.label, { color: theme.text.primary }]}>{t.name}</Text>
+                          <Text style={[textStyles.caption, { color: theme.text.muted }]}>@{t.identifier}</Text>
+                        </View>
+                        <Ionicons name="arrow-forward-outline" size={16} color={theme.text.muted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
 
             <View style={styles.cta}>
@@ -523,7 +661,7 @@ export default function SendMoneyScreen() {
             <Header title="Send Money" onBack={goBack} theme={theme} />
 
             <View style={[styles.recipientCard, { backgroundColor: theme.bg.secondary }]}>
-              <View style={[styles.avatar, { backgroundColor: theme.brand.primary }]}>
+              <View style={[styles.avatar, { backgroundColor: avatarColor(recipient?.name ?? 'A') }]}>
                 <Text style={[textStyles.h3, { color: '#fff' }]}>{recipient?.name[0]}</Text>
               </View>
               <View>
@@ -698,6 +836,45 @@ const styles = StyleSheet.create({
   body:    { flex: 1, paddingTop: spacing[4] },
   cta:     { paddingVertical: spacing[5] },
 
+  // Beneficiary row
+  beneficiarySection: { marginBottom: spacing[4] },
+  beneficiaryScroll:  { gap: spacing[4], paddingRight: spacing[2] },
+  beneficiaryItem:    { alignItems: 'center', width: 56 },
+  beneficiaryAvatar:  {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  starBadge: {
+    position: 'absolute', bottom: -2, right: -2,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Tag input + suggestion box
+  inputWrap: { position: 'relative', zIndex: 10 },
+  suggestionBox: {
+    position: 'absolute',
+    top: 58,
+    left: 0,
+    right: 0,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  suggestionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    borderBottomWidth: 0.5,
+  },
+  suggestAvatar: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   recipientCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     borderRadius: radius.xl, padding: spacing[4], marginBottom: spacing[4],
@@ -712,7 +889,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl, padding: spacing[4],
     marginBottom: spacing[4], gap: spacing[2],
   },
-  amountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  amountRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
   quickRow: {
@@ -739,7 +916,7 @@ const styles = StyleSheet.create({
 
   methodTabs: {
     flexDirection: 'row', borderRadius: radius.full,
-    padding: spacing[1], marginHorizontal: spacing[4], marginBottom: spacing[4],
+    padding: spacing[1], marginBottom: spacing[4],
   },
   methodTab: {
     flex: 1, flexDirection: 'row', alignItems: 'center',

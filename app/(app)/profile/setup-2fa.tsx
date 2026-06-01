@@ -1,4 +1,4 @@
-import React, { useState, Component } from 'react';
+﻿import React, { useState, Component } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
@@ -84,7 +84,7 @@ export default function Setup2faScreen() {
       setResult(res);
       setStep('setup');
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Could not start 2FA setup. Try again.');
+      setError(err?.message ?? 'Could not start 2FA setup. Try again.');
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ export default function Setup2faScreen() {
     } catch (err: any) {
       setOtpError(true);
       otpRef.current?.reset();
-      setError(err?.response?.data?.message ?? 'Invalid code. Please try again.');
+      setError(err?.message ?? 'Invalid code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -116,7 +116,7 @@ export default function Setup2faScreen() {
     setTimeout(() => setSecretCopied(false), 3000);
   }
 
-  // ── Step: method selection ────────────────────────────────────────
+  // â”€â”€ Step: method selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'method') {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
@@ -156,7 +156,7 @@ export default function Setup2faScreen() {
     );
   }
 
-  // ── Step: setup info (QR or "code sent") ─────────────────────────
+  // â”€â”€ Step: setup info (QR or "code sent") â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'setup') {
     const isTotp = result?.type === 'totp';
 
@@ -242,7 +242,7 @@ export default function Setup2faScreen() {
     );
   }
 
-  // ── Step: confirm code ────────────────────────────────────────────
+  // â”€â”€ Step: confirm code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'confirm') {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
@@ -271,7 +271,7 @@ export default function Setup2faScreen() {
     );
   }
 
-  // ── Step: success ─────────────────────────────────────────────────
+  // â”€â”€ Step: success â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
       <View style={styles.successContent}>

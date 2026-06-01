@@ -168,7 +168,7 @@ export default function HomeScreen() {
             amount={item.amount}
             narration={item.narration}
             status={item.status}
-            createdAt={item.created_at}
+            createdAt={item.createdAt}
             metadata={item.metadata}
           />
         </TouchableOpacity>
@@ -187,7 +187,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]} edges={['left', 'right']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]} edges={['top', 'left', 'right']}>
       <FlatList
         data={hasTransactions ? wallet.transactions : []}
         keyExtractor={(item) => item.id}
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     justifyContent:    'space-between',
     alignItems:        'center',
     paddingHorizontal: spacing[5],
-    paddingTop:        spacing[12],
+    paddingTop:        spacing[4],
     paddingBottom:     spacing[3],
   },
   userRow: {

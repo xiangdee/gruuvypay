@@ -2,7 +2,7 @@
 // Full crypto experience — portfolio, live prices, buy/sell
 // This tab owns everything crypto — home screen has zero crypto content
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View, Text, FlatList,
   RefreshControl, StyleSheet, TouchableOpacity,
@@ -28,10 +28,12 @@ export default function CryptoScreen() {
   const {
     prices, holdings, portfolio,
     refreshing, pricesLoading, hasHoldings,
-    onRefresh,
+    onRefresh, loadAll,
     handleBuy, handleSell, handleCoinDetail,
     handleSend, handleReceive,
   } = useCryptoLogic();
+
+  useEffect(() => { loadAll(); }, []);
 
   // ─── Header — portfolio card + section labels ────────────────────────
   function renderHeader() {
@@ -43,7 +45,7 @@ export default function CryptoScreen() {
             Crypto
           </Text>
           <TouchableOpacity
-            onPress={() => router.push('/(app)/transactions' as any)}
+            onPress={() => router.push('/(app)/crypto/transactions' as any)}
             style={[styles.historyBtn, { backgroundColor: theme.bg.card }]}
           >
             <Ionicons name="time-outline" size={18} color={theme.text.secondary} />
@@ -56,11 +58,11 @@ export default function CryptoScreen() {
         {/* Portfolio card */}
         <PortfolioCard
           totalNGN={portfolio.totalNGN}
-          totalUSD={portfolio.totalUSD}
           hasHoldings={hasHoldings}
-          onSend={() => handleSend('BTC')}
-          onReceive={() => handleReceive('BTC')}
-          onBuy={() => handleBuy('BTC')}
+          onSend={() => handleSend()}
+          onReceive={() => handleReceive()}
+          onBuy={() => handleBuy()}
+          onSell={() => handleSell()}
         />
 
         {/* My Holdings section — only shown if user has crypto */}

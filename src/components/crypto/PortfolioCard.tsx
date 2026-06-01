@@ -5,40 +5,35 @@ import { useTheme, textStyles, spacing, radius } from '@/theme';
 import { palette } from '@/theme/colors';
 
 interface PortfolioCardProps {
-  totalNGN:   string;
-  totalUSD:   string;
+  totalNGN:    string;
   hasHoldings: boolean;
-  onSend:     () => void;
-  onReceive:  () => void;
-  onBuy:      () => void;
+  onSend:      () => void;
+  onReceive:   () => void;
+  onBuy:       () => void;
+  onSell:      () => void;
 }
 
 export function PortfolioCard({
-  totalNGN, totalUSD, hasHoldings,
-  onSend, onReceive, onBuy,
+  totalNGN, hasHoldings,
+  onSend, onReceive, onBuy, onSell,
 }: PortfolioCardProps) {
   const { theme } = useTheme();
 
   return (
     <View style={[styles.card, { backgroundColor: theme.brand.primary }]}>
-      {/* Portfolio label */}
-      <Text style={[textStyles.labelSm, { color:  palette.black, letterSpacing: 1 }]}>
+      <Text style={[textStyles.labelSm, { color: palette.black, letterSpacing: 1 }]}>
         CRYPTO PORTFOLIO
       </Text>
 
-      {/* Total value */}
       <Text style={[textStyles.display, { color: palette.white, marginVertical: spacing[2] }]}>
         {totalNGN}
       </Text>
-      <Text style={[textStyles.body, { color: '#000' }]}>
-        ≈ {totalUSD}
-      </Text>
 
-      {/* Action buttons */}
       <View style={styles.actions}>
-        <ActionBtn icon="arrow-up-outline"    label="Send"    onPress={onSend}    />
-        <ActionBtn icon="arrow-down-outline"  label="Receive" onPress={onReceive} />
-        <ActionBtn icon="add-circle-outline"  label="Buy"     onPress={onBuy}     />
+        <ActionBtn icon="arrow-up-outline"     label="Send"    onPress={onSend}    />
+        <ActionBtn icon="arrow-down-outline"   label="Receive" onPress={onReceive} />
+        <ActionBtn icon="add-circle-outline"   label="Buy"     onPress={onBuy}     />
+        <ActionBtn icon="swap-horizontal"      label="Sell"    onPress={onSell}    />
       </View>
     </View>
   );
@@ -67,7 +62,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection:  'row',
-    gap:            spacing[6],
+    justifyContent: 'space-between',
     marginTop:      spacing[5],
   },
   actionBtn: {

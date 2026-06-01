@@ -1,11 +1,11 @@
-
+﻿
 // Real airtime-to-cash flow via automation.airtimetocash.com
 //
 // Steps:
 //   1. User enters phone + network + amount
-//   2. OTP sent to user's SIM → user enters OTP
+//   2. OTP sent to user's SIM â†’ user enters OTP
 //   3. We show SIM info (balance, tariff) + quota check
-//   4. User enters SIM transfer PIN → transfer executed → NGN credited
+//   4. User enters SIM transfer PIN â†’ transfer executed â†’ NGN credited
 
 import React, { useState, useEffect } from "react";
 import {
@@ -49,7 +49,7 @@ export default function AirtimeToCashScreen() {
   const grossPayout = amount ? Math.floor(parseInt(amount || "0") * network.rate / 100) : 0;
   const cashAmount  = Math.max(0, grossPayout - 100);  // user receives after ₦100 fee
 
-  // ── Step 1: Send OTP ──────────────────────────────────────────────────────
+  // â”€â”€ Step 1: Send OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function sendOtp() {
     if (phone.length < 10) { toast.error("Enter a valid phone number"); return; }
     const amt = parseInt(amount);
@@ -65,11 +65,11 @@ export default function AirtimeToCashScreen() {
       toast.success("OTP Sent", `Enter the OTP sent to ${phone}`);
       setStep("otp");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Could not send OTP");
+      toast.error(err?.message ?? "Could not send OTP");
     } finally { setLoading(false); }
   }
 
-  // ── Step 2: Verify OTP then login with session ────────────────────────────
+  // â”€â”€ Step 2: Verify OTP then login with session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function verifyOtp() {
     if (otp.length < 4) { toast.error("Enter the OTP sent to your phone"); return; }
     setLoading(true);
@@ -94,7 +94,7 @@ export default function AirtimeToCashScreen() {
       setSimInfo(sessionRes.data);
       setStep("siminfo");
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Invalid OTP";
+      const msg = err?.message ?? "Invalid OTP";
       if (msg.toLowerCase().includes("session")) {
         toast.error("Session error. Please request a new OTP.");
         setStep("otp");
@@ -104,7 +104,7 @@ export default function AirtimeToCashScreen() {
     } finally { setLoading(false); }
   }
 
-  // ── Step 3: Check quota + proceed to PIN ──────────────────────────────────
+  // â”€â”€ Step 3: Check quota + proceed to PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function checkAndProceed() {
     setLoading(true);
     try {
@@ -124,7 +124,7 @@ export default function AirtimeToCashScreen() {
     } finally { setLoading(false); }
   }
 
-  // ── Step 4: Transfer ──────────────────────────────────────────────────────
+  // â”€â”€ Step 4: Transfer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function transfer() {
     if (simPin.length < 4) { toast.error("Enter your SIM transfer PIN"); return; }
     setLoading(true);
@@ -139,7 +139,7 @@ export default function AirtimeToCashScreen() {
       setResult(res.data);
       setStep("success");
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Transfer failed";
+      const msg = err?.message ?? "Transfer failed";
       if (msg.toLowerCase().includes("session")) {
         toast.error("Session expired. Please start again.");
         setStep("form");
@@ -196,7 +196,7 @@ export default function AirtimeToCashScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-        {/* ── STEP 1: Form ────────────────────────────────────────────── */}
+        {/* â”€â”€ STEP 1: Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {step === "form" && (
           <>
             {/* Network */}
@@ -223,7 +223,7 @@ export default function AirtimeToCashScreen() {
             <View style={[styles.rateCard, { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}>
               <Text style={[textStyles.label, { color: "#1D4ED8" }]}>Rate & Fees</Text>
               <Text style={[textStyles.body, { color: "#1E40AF" }]}>
-                ₦100 airtime → ₦{network.rate} gross
+                ₦100 airtime â†’ ₦{network.rate} gross
               </Text>
               <Text style={[textStyles.caption, { color: "#6B7280" }]}>
                 Service fee: ₦100 per transaction
@@ -277,7 +277,7 @@ export default function AirtimeToCashScreen() {
           </>
         )}
 
-        {/* ── STEP 2: OTP ──────────────────────────────────────────────── */}
+        {/* â”€â”€ STEP 2: OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {step === "otp" && (
           <View style={styles.center}>
             <View style={[styles.otpIcon, { backgroundColor: "#EFF6FF" }]}>
@@ -311,7 +311,7 @@ export default function AirtimeToCashScreen() {
           </View>
         )}
 
-        {/* ── STEP 3: SIM Info ─────────────────────────────────────────── */}
+        {/* â”€â”€ STEP 3: SIM Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {step === "siminfo" && simInfo && (
           <>
             <View style={[styles.simCard, { backgroundColor: theme.bg.secondary }]}>
@@ -348,7 +348,7 @@ export default function AirtimeToCashScreen() {
           </>
         )}
 
-        {/* ── STEP 4: SIM PIN ──────────────────────────────────────────── */}
+        {/* â”€â”€ STEP 4: SIM PIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {step === "pin" && (
           <View style={styles.center}>
             <View style={[styles.otpIcon, { backgroundColor: "#FEF9C3" }]}>
@@ -387,7 +387,7 @@ export default function AirtimeToCashScreen() {
           </View>
         )}
 
-        {/* ── STEP 5: Success ───────────────────────────────────────────── */}
+        {/* â”€â”€ STEP 5: Success â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {step === "success" && result && (
           <View style={styles.center}>
             <Ionicons name="checkmark-circle" size={80} color="#22C55E" />

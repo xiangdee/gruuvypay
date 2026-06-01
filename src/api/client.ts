@@ -84,8 +84,6 @@ apiClient.interceptors.request.use(
     // X-Device-UA — parsed by server for session management
     config.headers['X-Device-UA'] = await getDeviceUA();
 
-    console.log('config', config);
-
     return config;
   },
   (error) => Promise.reject(error),

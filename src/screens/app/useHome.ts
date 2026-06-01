@@ -22,7 +22,6 @@ export function useHomeLogic() {
   // Initial load
   useEffect(() => {
     dispatch(fetchBalance());
-    setInterval(() => dispatch(fetchBalance()), 30000);
     dispatch(fetchTransactions({ page: 1 }));
     dispatch(fetchVirtualAccount());
   }, []);

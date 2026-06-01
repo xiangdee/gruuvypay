@@ -1,216 +1,242 @@
-// TIER_1 → TIER_2: NIN + Utility Bill upload
+// TIER_1 → TIER_2: MetaMap NIN verification via in-app WebView
+// Flow:
+//   1. Call /kyc/nin/start → get verificationUrl
+//   2. Show WebView modal with MetaMap URL
+//   3. User completes NIN verification inside WebView
+//   4. User taps Done → poll /kyc/status until tier == TIER_2 or timeout
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity,
-  ScrollView, StyleSheet, Image,
+  View, Text, TouchableOpacity, Modal,
+  ScrollView, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { useAppDispatch } from '@/store/hooks';
-import { setUser } from '@/store/slices/auth.slice';
-import { kycApi } from '@/api/kyc.api';
-import { Input }     from '@/components/ui/Input';
-import { Button }    from '@/components/ui/Button';
-import { ErrorCard } from '@/components/ui/ErrorCard';
+import { WebView }           from 'react-native-webview';
+import { Ionicons }          from '@expo/vector-icons';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import { useRouter }         from 'expo-router';
+import { useAppDispatch }    from '@/store/hooks';
+import { setUser }           from '@/store/slices/auth.slice';
+import { kycApi }            from '@/api/kyc.api';
+import { Button }            from '@/components/ui/Button';
+import { ErrorCard }         from '@/components/ui/ErrorCard';
 import { useTheme, textStyles, spacing, radius } from '@/theme';
 
-const UTILITY_TYPES = [
-  { id: 'electricity', label: 'Electricity Bill' },
-  { id: 'water',       label: 'Water Bill' },
-  { id: 'waste',       label: 'Waste Management' },
-  { id: 'internet',    label: 'Internet / DSTV Bill' },
-];
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS  = 3 * 60 * 1000; // 3 minutes
+
+type Step = 'idle' | 'starting' | 'browser' | 'polling' | 'success' | 'review';
 
 export default function NinScreen() {
   const { theme }  = useTheme();
   const router     = useRouter();
   const dispatch   = useAppDispatch();
 
-  const [nin,          setNin]          = useState('');
-  const [utilityType,  setUtilityType]  = useState('electricity');
-  const [imageUri,     setImageUri]     = useState<string | null>(null);
-  const [uploading,    setUploading]    = useState(false);
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState('');
-  const [success,      setSuccess]      = useState(false);
+  const [step,           setStep]           = useState<Step>('idle');
+  const [error,          setError]          = useState('');
+  const [webViewUrl,     setWebViewUrl]     = useState('');
+  const [webViewVisible, setWebViewVisible] = useState(false);
 
-  async function pickImage() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setError('Please allow access to your photo library');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality:    0.7,
-      allowsEditing: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setError('');
-    }
+  const pollTimer  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>  | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimer.current)  clearInterval(pollTimer.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  function stopPolling() {
+    if (pollTimer.current)  { clearInterval(pollTimer.current);  pollTimer.current  = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current);  timeoutRef.current = null; }
   }
 
-  async function takePhoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      setError('Please allow camera access');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      quality:    0.7,
-      allowsEditing: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setError('');
-    }
+  function startPolling() {
+    setStep('polling');
+
+    pollTimer.current = setInterval(async () => {
+      try {
+        const status = await kycApi.getStatus();
+        if (status.tier === 'TIER_2' || status.ninVerified) {
+          stopPolling();
+          dispatch(setUser({ tier: 'TIER_2' } as any));
+          setStep('success');
+        } else if (status.rejectionReason?.includes('review')) {
+          stopPolling();
+          setStep('review');
+        }
+      } catch {
+        // transient error — keep polling
+      }
+    }, POLL_INTERVAL_MS);
+
+    timeoutRef.current = setTimeout(() => {
+      stopPolling();
+      setStep('review');
+    }, POLL_TIMEOUT_MS);
   }
 
-  async function handleSubmit() {
-    if (!/^\d{11}$/.test(nin)) { setError('Enter a valid 11-digit NIN'); return; }
-    if (!imageUri)              { setError('Upload your utility bill');   return; }
+  function handleWebViewClose() {
+    setWebViewVisible(false);
+    startPolling();
+  }
 
+  async function startVerification() {
     setError('');
-    setUploading(true);
-
+    setStep('starting');
     try {
-      // Upload image first
-      const { url } = await kycApi.uploadDocument(imageUri, 'utility-bill');
-
-      setUploading(false);
-      setLoading(true);
-
-      // Submit NIN + document URL
-      await kycApi.submitNin({ nin, utilityBillUrl: url, utilityType });
-
-      dispatch(setUser({ tier: 'TIER_2' } as any));
-      setSuccess(true);
+      const { verificationUrl } = await kycApi.startNin();
+      setWebViewUrl(verificationUrl);
+      setWebViewVisible(true);
+      setStep('browser');
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Submission failed. Please try again.');
-    } finally {
-      setUploading(false);
-      setLoading(false);
+      setError(err?.message ?? 'Could not start verification. Try again.');
+      setStep('idle');
     }
   }
 
-  if (success) {
+  // ── Success ───────────────────────────────────────────────────────────
+  if (step === 'success') {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
-        <View style={styles.successScreen}>
+        <View style={styles.center}>
           <Ionicons name="checkmark-circle" size={72} color={theme.status.success} />
           <Text style={[textStyles.h2, { color: theme.text.primary, marginTop: spacing[5] }]}>
-            Documents Verified!
+            NIN Verified!
           </Text>
           <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
-            Your account has been upgraded to Tier 2. You can now send up to ₦1,000,000 per transaction.
+            Your NIN has been verified and your account has been upgraded to Tier 2.
           </Text>
-          <Button label="Continue" onPress={() => router.replace('/(app)/kyc')} style={styles.successBtn} />
+          <Button
+            label="Continue"
+            onPress={() => router.replace('/(app)/kyc')}
+            style={styles.btn}
+          />
         </View>
       </SafeAreaView>
     );
   }
 
+  // ── Under review / polling timeout ────────────────────────────────────
+  if (step === 'review') {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
+        <View style={styles.center}>
+          <Ionicons name="time-outline" size={64} color={theme.brand.primary} />
+          <Text style={[textStyles.h2, { color: theme.text.primary, marginTop: spacing[5] }]}>
+            Verification Submitted
+          </Text>
+          <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
+            Your NIN verification is being reviewed. This usually takes a few minutes.
+            You'll be notified once your account is upgraded.
+          </Text>
+          <Button
+            label="Check Again"
+            onPress={() => startPolling()}
+            style={styles.btn}
+          />
+          <TouchableOpacity onPress={() => router.replace('/(app)/kyc')} style={{ marginTop: spacing[3] }}>
+            <Text style={[textStyles.label, { color: theme.text.muted }]}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────
+  if (step === 'polling') {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.brand.primary} />
+          <Text style={[textStyles.h3, { color: theme.text.primary, marginTop: spacing[5] }]}>
+            Processing Verification…
+          </Text>
+          <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
+            We're confirming your NIN with NIMC. This usually takes under a minute.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Idle / starting / browser ─────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
+
+      {/* ── MetaMap WebView Modal ── */}
+      <Modal
+        visible={webViewVisible}
+        animationType="slide"
+        onRequestClose={handleWebViewClose}
+      >
+        <SafeAreaProvider>
+        <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg.primary }]}>
+          <View style={[styles.webViewHeader, { backgroundColor: theme.bg.card, borderBottomColor: theme.border.DEFAULT }]}>
+            <Text style={[textStyles.label, { color: theme.text.primary }]}>NIN Verification</Text>
+            <TouchableOpacity onPress={handleWebViewClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={[textStyles.label, { color: theme.brand.primary }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <WebView
+            source={{ uri: webViewUrl }}
+            style={{ flex: 1 }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.webViewLoading}>
+                <ActivityIndicator size="large" color={theme.brand.primary} />
+              </View>
+            )}
+          />
+        </SafeAreaView>
+        </SafeAreaProvider>
+      </Modal>
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
-          <Ionicons name="document-text-outline" size={32} color={theme.brand.primary} />
+          <Ionicons name="finger-print" size={48} color={theme.brand.primary} />
           <Text style={[textStyles.h2, { color: theme.text.primary, marginTop: spacing[3] }]}>
-            NIN + Utility Bill
+            NIN Verification
           </Text>
           <Text style={[textStyles.body, { color: theme.text.secondary, textAlign: 'center', marginTop: spacing[2] }]}>
-            Submit your National Identification Number and a recent utility bill (not older than 3 months).
+            Your National Identification Number (NIN) will be verified directly with NIMC to upgrade your account to Tier 2.
+          </Text>
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: theme.bg.secondary }]}>
+          {[
+            { icon: 'shield-checkmark-outline', text: 'Secure verification powered by MetaMap' },
+            { icon: 'time-outline',             text: 'Takes about 1–2 minutes to complete' },
+            { icon: 'phone-portrait-outline',   text: 'Your NIN will be captured and verified in-app' },
+          ].map((item, i) => (
+            <View key={i} style={styles.infoRow}>
+              <Ionicons name={item.icon as any} size={20} color={theme.brand.primary} />
+              <Text style={[textStyles.body, { color: theme.text.secondary, flex: 1 }]}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.tipsCard, { backgroundColor: theme.bg.secondary, borderColor: theme.brand.primary + '30', borderWidth: 1 }]}>
+          <Text style={[textStyles.label, { color: theme.text.primary, marginBottom: spacing[2] }]}>
+            Before you start:
+          </Text>
+          <Text style={[textStyles.caption, { color: theme.text.muted }]}>
+            • Have your NIN slip or NIMC card ready{'\n'}
+            • Dial *346# to get your NIN if you don't know it{'\n'}
+            • Make sure you're in good lighting for liveness check{'\n'}
+            • Allow camera access when prompted
           </Text>
         </View>
 
         {error ? <ErrorCard message={error} /> : null}
 
-        <Input
-          label="NIN (National Identification Number)"
-          placeholder="Enter your 11-digit NIN"
-          keyboardType="numeric"
-          value={nin}
-          onChangeText={(t) => { setNin(t.replace(/\D/g, '').slice(0, 11)); setError(''); }}
-          maxLength={11}
-          hint="Dial *346# to get your NIN"
-        />
-
-        {/* Utility bill type */}
-        <View>
-          <Text style={[textStyles.label, { color: theme.text.primary, marginBottom: spacing[2] }]}>
-            Utility Bill Type
-          </Text>
-          <View style={styles.utilityRow}>
-            {UTILITY_TYPES.map((u) => (
-              <TouchableOpacity
-                key={u.id}
-                onPress={() => setUtilityType(u.id)}
-                style={[
-                  styles.utilityChip,
-                  { backgroundColor: theme.bg.secondary },
-                  utilityType === u.id && { backgroundColor: theme.brand.primary + '15', borderColor: theme.brand.primary, borderWidth: 1.5 },
-                ]}
-              >
-                <Text style={[
-                  textStyles.labelSm,
-                  { color: utilityType === u.id ? theme.brand.primary : theme.text.secondary },
-                ]}>
-                  {u.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Image upload */}
-        <View>
-          <Text style={[textStyles.label, { color: theme.text.primary, marginBottom: spacing[2] }]}>
-            Utility Bill Photo
-          </Text>
-
-          {imageUri ? (
-            <View style={styles.imagePreview}>
-              <Image source={{ uri: imageUri }} style={styles.previewImg} resizeMode="cover" />
-              <TouchableOpacity
-                onPress={() => setImageUri(null)}
-                style={[styles.removeImg, { backgroundColor: theme.status.error }]}
-              >
-                <Ionicons name="close" size={16} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.uploadRow}>
-              <TouchableOpacity
-                onPress={pickImage}
-                style={[styles.uploadBtn, { backgroundColor: theme.bg.secondary }]}
-              >
-                <Ionicons name="image-outline" size={24} color={theme.brand.primary} />
-                <Text style={[textStyles.label, { color: theme.brand.primary }]}>Gallery</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={takePhoto}
-                style={[styles.uploadBtn, { backgroundColor: theme.bg.secondary }]}
-              >
-                <Ionicons name="camera-outline" size={24} color={theme.brand.primary} />
-                <Text style={[textStyles.label, { color: theme.brand.primary }]}>Camera</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          <Text style={[textStyles.caption, { color: theme.text.muted, marginTop: spacing[1] }]}>
-            Must show your name, address, and be dated within 3 months
-          </Text>
-        </View>
-
         <Button
-          label={uploading ? 'Uploading...' : loading ? 'Submitting...' : 'Submit Documents'}
-          onPress={handleSubmit}
-          loading={uploading || loading}
-          disabled={nin.length !== 11 || !imageUri}
+          label={step === 'starting' ? 'Preparing…' : 'Start NIN Verification'}
+          onPress={startVerification}
+          loading={step === 'starting'}
+          disabled={step === 'starting'}
+          style={styles.btn}
         />
 
         <View style={{ height: spacing[8] }} />
@@ -220,26 +246,27 @@ export default function NinScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:        { flex: 1 },
-  content:     { padding: spacing[4], gap: spacing[4] },
-  header:      { alignItems: 'center', marginBottom: spacing[2] },
-  utilityRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  utilityChip: { paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.full },
-  uploadRow:   { flexDirection: 'row', gap: spacing[3] },
-  uploadBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    gap: spacing[2], borderRadius: radius.xl,
-    paddingVertical: spacing[5],
+  safe:    { flex: 1 },
+  content: { padding: spacing[4], gap: spacing[4] },
+  center:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing[6] },
+  header:  { alignItems: 'center', marginBottom: spacing[2] },
+  infoCard:{ borderRadius: radius.xl, padding: spacing[4], gap: spacing[3] },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  tipsCard:{ borderRadius: radius.xl, padding: spacing[4] },
+  btn:     { marginTop: spacing[2] },
+
+  webViewHeader: {
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+    paddingHorizontal: spacing[5],
+    paddingVertical:   spacing[4],
+    borderBottomWidth: 1,
   },
-  imagePreview: { position: 'relative', borderRadius: radius.xl, overflow: 'hidden' },
-  previewImg:   { width: '100%', height: 200 },
-  removeImg: {
-    position: 'absolute', top: spacing[2], right: spacing[2],
-    width: 28, height: 28, borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
+  webViewLoading: {
+    position:       'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
-  successScreen: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing[6],
-  },
-  successBtn: { width: '100%', marginTop: spacing[8] },
 });

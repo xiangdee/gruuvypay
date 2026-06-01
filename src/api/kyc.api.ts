@@ -38,41 +38,27 @@ export const kycApi = {
     return data;
   },
 
-  // ── NIN + Utility bill ───────────────────────────────────────────────────
-  submitNin: async (payload: {
-    nin:            string;
-    utilityBillUrl: string;
-    utilityType:    string;
-  }): Promise<{ success: boolean; message: string; tier: string }> => {
-    const { data } = await apiClient.post('/kyc/nin', payload);
+  // ── NIN — MetaMap WebView flow (TIER_1 → TIER_2) ─────────────────────────
+  // Returns a verificationUrl; app opens it in an in-app browser.
+  // MetaMap handles NIN capture + NIMC lookup internally.
+  // Tier upgrade happens server-side when MetaMap fires the webhook.
+  startNin: async (): Promise<{
+    success:         boolean;
+    verificationUrl: string;
+    verificationId:  string;
+    message:         string;
+  }> => {
+    const { data } = await apiClient.post('/kyc/nin/start');
     return data;
   },
 
-  // ── Address verification ─────────────────────────────────────────────────
-  submitAddress: async (payload: {
-    address:          string;
-    city:             string;
-    state:            string;
-    proofOfAddressUrl: string;
-    addressDocType:   string;
-  }): Promise<{ success: boolean; message: string; tier: string }> => {
-    const { data } = await apiClient.post('/kyc/address', payload);
-    return data;
-  },
-
-  // ── Upload document ──────────────────────────────────────────────────────
-  uploadDocument: async (uri: string, type: string): Promise<{ url: string }> => {
-    const formData = new FormData();
-    formData.append('file', {
-      uri,
-      type:  'image/jpeg',
-      name:  `kyc-${type}-${Date.now()}.jpg`,
-    } as any);
-    formData.append('type', type);
-
-    const { data } = await apiClient.post('/kyc/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  // ── Address — Manual submission (TIER_2 → TIER_3, admin approves) ───────
+  submitAddressManually: async (params: {
+    address: string;
+    city:    string;
+    state:   string;
+  }): Promise<{ success: boolean; message: string }> => {
+    const { data } = await apiClient.post('/kyc/address/submit', params);
     return data;
   },
 };

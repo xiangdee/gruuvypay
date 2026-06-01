@@ -96,7 +96,7 @@ export default function NotificationsSettingsScreen() {
           body:  'Push notifications are working correctly.',
           data:  { type: 'test' },
         },
-        trigger: { seconds: 1 },
+        trigger: null,
       });
       toast.success('Test notification sent');
     } catch {
